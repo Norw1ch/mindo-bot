@@ -388,8 +388,11 @@ async function flushEdit(el, final) {
   }
 }
 
-// Сохранить всё недописанное — перед переходами
+// Сохранить всё недописанное — перед переходами. Уход с поля сам сохраняет текст
+// (и добавляет недописанный пункт списка), а оставшиеся отложенные правки дописываем
 function flushAllEdits() {
+  const active = document.activeElement;
+  if (isTyping(active)) active.blur();
   [...editTimers.keys()].forEach((el) => flushEdit(el, true));
 }
 
