@@ -83,16 +83,12 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .row .chev { flex: none; color: var(--faint); }
 .row.danger { color: var(--red); }
 .row .st { flex: none; width: 22px; text-align: center; font-size: 15px; }
-/* Текст идеи в списке — не больше двух строк */
-.row .title.clamp {
-  white-space: normal; word-break: break-word;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-}
 
 /* ---------- Карточка идеи ---------- */
 .card { margin-top: 22px; padding: 18px 20px; border-radius: 20px; background: var(--cell); }
 .card .status { margin-bottom: 12px; color: var(--muted); font-size: 15px; }
 .idea-text { white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
+.idea-text.none { color: var(--faint); }
 .card .date { margin-top: 16px; color: var(--faint); font-size: 13px; }
 
 /* Тонкие разделители с отступом слева, как в iOS */
@@ -158,6 +154,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .sheet.open .sheet-box { animation: alert-in .45s var(--soft) both; }
 .sheet.closing .sheet-box { animation: alert-out .25s ease-in both; }
 .sheet-title { margin-bottom: 14px; font-weight: 600; text-align: center; }
+.sheet-fields { display: grid; gap: 10px; }
 .sheet textarea {
   display: block; width: 100%; padding: 12px 14px; resize: none;
   border: 0; border-radius: 16px; outline: none;

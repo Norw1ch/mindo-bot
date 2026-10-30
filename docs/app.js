@@ -53,7 +53,7 @@ const store = {
 
 // ---------- Данные ----------
 // sections: [{id, name}] — в ключе "sections"
-// ideas: {id, sec, text, st, at} — каждая идея в своём ключе "i_<id>"
+// ideas: {id, sec, title, text, st, at} — каждая идея в своём ключе "i_<id>"
 
 const data = { sections: [], ideas: [] };
 
@@ -67,7 +67,21 @@ async function loadData() {
   data.ideas = Object.keys(raw)
     .filter((k) => k.startsWith('i_'))
     .map((k) => parse(raw[k]))
-    .filter(Boolean);
+    .filter(Boolean)
+    .map(normalizeIdea);
+}
+
+// Старые идеи без заголовка: первая строка текста становится заголовком, остальное — описанием
+function normalizeIdea(idea) {
+  if (idea.title) return idea;
+  const [first, ...rest] = idea.text.split('\n');
+  if (first.length <= TITLE_MAX) {
+    idea.title = first.trim();
+    idea.text = rest.join('\n').trim();
+  } else {
+    idea.title = shorten(first, TITLE_MAX);
+  }
+  return idea;
 }
 
 function activeCount(sectionId) {
@@ -107,7 +121,7 @@ async function deleteIdeaData(id) {
 }
 
 function confirmDeleteIdea(id) {
-  return confirmDialog(`Удалить идею «${shorten(findIdea(id).text, 40)}»?`);
+  return confirmDialog(`Удалить идею «${shorten(findIdea(id).title, 40)}»?`);
 }
 
 // Удаляет раздел вместе с его идеями: сначала идеи, потом сам раздел
@@ -276,7 +290,7 @@ views.section = (route) => {
       <button class="swipe-del" data-act="swipe-delete" data-kind="idea" data-id="${idea.id}">Удалить</button>
       <button class="row" data-act="open-idea" data-id="${idea.id}">
         <span class="st">${STATUS[idea.st].icon}</span>
-        <span class="title clamp">${esc(idea.text)}</span>
+        <span class="title">${esc(idea.title)}</span>
         ${CHEVRON}
       </button>
     </div>`).join('');
@@ -299,17 +313,21 @@ views.idea = (route) => {
   if (!idea) return '<p class="empty">Идея не найдена</p>';
   const section = findSection(idea.sec);
   const st = STATUS[idea.st];
+  const swap = takeFlash(idea.id) ? ' swap' : '';
+  const text = idea.text
+    ? `<p class="idea-text">${esc(idea.text)}</p>`
+    : '<p class="idea-text none">Без описания</p>';
 
   return `
-    <h1>Идея</h1>
+    <h1 class="${swap}">${esc(idea.title)}</h1>
     <p class="sub">${section ? esc(section.name) : ''}</p>
-    <div class="card">
+    <div class="card${swap}">
       <p class="status">${st.icon} ${st.label}</p>
-      <p class="idea-text${takeFlash(idea.id) ? ' swap' : ''}">${esc(idea.text)}</p>
+      ${text}
       <p class="date">Создана ${formatDate(idea.at)}</p>
     </div>
     <div class="group">
-      <button class="row" data-act="edit-idea" data-id="${idea.id}">Изменить текст</button>
+      <button class="row" data-act="edit-idea" data-id="${idea.id}">Изменить</button>
       <button class="row danger" data-act="delete-idea" data-id="${idea.id}">Удалить идею</button>
     </div>`;
 };
@@ -317,7 +335,16 @@ views.idea = (route) => {
 // ---------- Действия по нажатию ----------
 
 const SECTION_MAX = 50;
+const TITLE_MAX = 80;
 const IDEA_MAX = 3000; // в облаке Telegram на одну запись — до 4096 символов
+
+// Поля окна для идеи: заголовок и необязательное описание
+function ideaFields(idea = { title: '', text: '' }) {
+  return [
+    { value: idea.title, placeholder: 'Заголовок', max: TITLE_MAX },
+    { value: idea.text, placeholder: 'Описание — необязательно', max: IDEA_MAX, multiline: true, optional: true },
+  ];
+}
 
 const actions = {
   'back': back,
@@ -325,8 +352,9 @@ const actions = {
   'open-section': ({ id }) => go({ name: 'section', id }),
 
   'new-section': async () => {
-    const name = await ask({ title: 'Новый раздел', placeholder: 'Название', max: SECTION_MAX });
-    if (!name) return;
+    const res = await ask({ title: 'Новый раздел', fields: [{ placeholder: 'Название', max: SECTION_MAX }] });
+    if (!res) return;
+    const [name] = res;
     const id = newId();
     flash = id;
     await commit(() => {
@@ -337,8 +365,9 @@ const actions = {
 
   'rename-section': async ({ id }) => {
     const s = findSection(id);
-    const name = await ask({ title: 'Переименовать раздел', value: s.name, max: SECTION_MAX });
-    if (!name || name === s.name) return;
+    const res = await ask({ title: 'Переименовать раздел', fields: [{ value: s.name, max: SECTION_MAX }] });
+    if (!res || res[0] === s.name) return;
+    const [name] = res;
     flash = id;
     await commit(() => {
       s.name = name;
@@ -366,9 +395,10 @@ const actions = {
   },
 
   'add-idea': async ({ id }) => {
-    const text = await ask({ title: 'Новая идея', placeholder: 'Текст идеи', max: IDEA_MAX, multiline: true });
-    if (!text) return;
-    const idea = { id: newId(), sec: id, text, st: 'new', at: Date.now() };
+    const res = await ask({ title: 'Новая идея', fields: ideaFields() });
+    if (!res) return;
+    const [title, text] = res;
+    const idea = { id: newId(), sec: id, title, text, st: 'new', at: Date.now() };
     flash = idea.id;
     await commit(() => {
       data.ideas.push(idea);
@@ -380,10 +410,13 @@ const actions = {
 
   'edit-idea': async ({ id }) => {
     const idea = findIdea(id);
-    const text = await ask({ title: 'Изменить идею', value: idea.text, max: IDEA_MAX, multiline: true });
-    if (!text || text === idea.text) return;
+    const res = await ask({ title: 'Изменить идею', fields: ideaFields(idea) });
+    if (!res) return;
+    const [title, text] = res;
+    if (title === idea.title && text === idea.text) return;
     flash = id;
     await commit(() => {
+      idea.title = title;
       idea.text = text;
       return saveIdea(idea);
     });
@@ -539,33 +572,61 @@ function updateBackButton() {
 // ---------- Окно ввода и подтверждение ----------
 
 const sheet = document.getElementById('sheet');
-const sheetInput = document.getElementById('sheet-input');
+const sheetFields = document.getElementById('sheet-fields');
+let sheetInputs = [];
 let sheetResolve = null;
-let sheetMultiline = false;
 let sheetTimer;
 
-// Показывает окно ввода. Возвращает введённый текст или null при отмене
-function ask({ title, value = '', placeholder = '', max = 50, multiline = false }) {
+// Показывает окно ввода с полями fields: [{ value, placeholder, max, multiline, optional }].
+// Возвращает массив введённых строк или null при отмене
+function ask({ title, fields }) {
   clearTimeout(sheetTimer);
   closeSwipe();
   document.getElementById('sheet-title').textContent = title;
-  sheetInput.value = value;
-  sheetInput.placeholder = placeholder;
-  sheetInput.maxLength = max;
-  sheetInput.rows = multiline ? 6 : 1;
-  sheetMultiline = multiline;
+  sheetInputs = fields.map((f) => {
+    const el = document.createElement('textarea');
+    el.value = f.value || '';
+    el.placeholder = f.placeholder || '';
+    el.maxLength = f.max || 50;
+    el.rows = f.multiline ? 6 : 1;
+    el.dataset.multiline = f.multiline ? '1' : '';
+    el.dataset.optional = f.optional ? '1' : '';
+    el.addEventListener('keydown', onSheetKey);
+    // Однострочное поле растёт по высоте, если текст длинный
+    if (!f.multiline) el.addEventListener('input', () => autoGrow(el));
+    return el;
+  });
+  sheetFields.replaceChildren(...sheetInputs);
   sheet.classList.remove('closing');
   sheet.classList.add('open');
-  sheetInput.focus();
+  sheetInputs.forEach((el) => { if (!el.dataset.multiline) autoGrow(el); });
+  sheetInputs[0].focus();
   return new Promise((resolve) => {
     sheetResolve = resolve;
     updateBackButton();
   });
 }
 
+function autoGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
+// Enter в однострочном поле — к следующему полю или сохранить; Ctrl+Enter — сохранить всегда
+function onSheetKey(e) {
+  if (e.key !== 'Enter') return;
+  const el = e.target;
+  const force = e.ctrlKey || e.metaKey;
+  if (el.dataset.multiline && !force) return; // обычный перенос строки
+  e.preventDefault();
+  const next = sheetInputs[sheetInputs.indexOf(el) + 1];
+  if (next && !force) next.focus();
+  else saveSheet();
+}
+
 function closeSheet(result) {
   sheet.classList.add('closing'); // окно плавно уменьшается и исчезает
-  sheetInput.blur();
+  sheetInputs.forEach((el) => el.blur());
   sheetTimer = setTimeout(() => sheet.classList.remove('open', 'closing'), 260);
   const resolve = sheetResolve;
   sheetResolve = null;
@@ -574,25 +635,23 @@ function closeSheet(result) {
 }
 
 function saveSheet() {
-  const text = sheetInput.value.trim();
-  if (!text) {
+  // В однострочных полях переносы строк превращаем в пробелы
+  const values = sheetInputs.map((el) => (
+    el.dataset.multiline ? el.value.trim() : el.value.replace(/\s+/g, ' ').trim()
+  ));
+  const missing = sheetInputs.find((el, i) => !el.dataset.optional && !values[i]);
+  if (missing) {
     toast('Пусто');
+    missing.focus();
     return;
   }
-  closeSheet(text);
+  closeSheet(values);
 }
 
 document.getElementById('sheet-save').addEventListener('click', saveSheet);
 document.getElementById('sheet-cancel').addEventListener('click', () => closeSheet(null));
 // Нажатие на затемнённый фон — отмена
 sheet.addEventListener('click', (e) => { if (e.target === sheet) closeSheet(null); });
-// В однострочном поле Enter сохраняет, в многострочном — Ctrl+Enter
-sheetInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && (!sheetMultiline || e.ctrlKey || e.metaKey)) {
-    e.preventDefault();
-    saveSheet();
-  }
-});
 
 function confirmDialog(text) {
   return new Promise((resolve) => {
