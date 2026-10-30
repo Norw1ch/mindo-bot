@@ -14,6 +14,11 @@
   --field: rgba(118, 118, 128, 0.12);
   --shade: rgba(0, 0, 0, 0.12);
   --backdrop: rgba(0, 0, 0, 0.25);
+  --bar: rgba(249, 249, 249, 0.94);  /* панель вкладок */
+
+  /* Нижний отступ под «полоску» iPhone: берём больший из системного и телеграмовского */
+  --safe-b: max(env(safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px));
+  --tabbar-h: calc(54px + var(--safe-b));
 
   --ease: cubic-bezier(.32, .72, 0, 1);
   --soft: cubic-bezier(.2, .9, .3, 1);
@@ -33,6 +38,7 @@
   --field: rgba(118, 118, 128, 0.24);
   --shade: rgba(0, 0, 0, 0.5);
   --backdrop: rgba(0, 0, 0, 0.5);
+  --bar: rgba(22, 22, 22, 0.94);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -47,8 +53,31 @@ body {
 }
 button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
 
+/* ---------- Вкладки ---------- */
+/* У каждой вкладки свой слой .pane со своей стопкой экранов; виден только активный */
+#app { position: fixed; top: 0; left: 0; right: 0; bottom: var(--tabbar-h); overflow: hidden; }
+.pane { position: absolute; inset: 0; overflow: hidden; visibility: hidden; }
+.pane.active { visibility: visible; }
+.pane.tab-in { animation: tab-in .32s ease; }
+
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  display: flex; height: var(--tabbar-h); padding: 5px 4px var(--safe-b);
+  background: var(--bar);
+  -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+  box-shadow: 0 -0.5px 0 var(--sep);
+}
+.tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  color: var(--muted); font-size: 10px; font-weight: 500;
+  transition: color .25s ease;
+}
+.tab svg { width: 26px; height: 26px; transition: transform .3s var(--soft); }
+.tab:active svg { transform: scale(0.86); transition-duration: .1s; }
+.tab.active { color: var(--fg); }
+.tab.active svg { stroke-width: 2.1; }
+
 /* ---------- Экраны-слои ---------- */
-#app { position: fixed; inset: 0; overflow: hidden; }
 .screen {
   position: absolute; inset: 0;
   overflow-y: auto; overscroll-behavior: contain;
@@ -225,7 +254,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 
 /* ---------- Всплывающая подсказка ---------- */
 .toast {
-  position: fixed; z-index: 20; left: 50%; bottom: 28px; transform: translate(-50%, 16px) scale(0.96);
+  position: fixed; z-index: 20; left: 50%; bottom: calc(var(--tabbar-h) + 14px); transform: translate(-50%, 16px) scale(0.96);
   padding: 11px 20px; border-radius: 999px;
   background: var(--inv-bg); color: var(--inv-fg); font-size: 15px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
@@ -236,6 +265,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 
 /* ---------- Анимации ---------- */
 @keyframes in-fade     { from { opacity: 0; } }
+@keyframes tab-in      { from { opacity: 0; transform: translateY(6px); } }
 @keyframes row-in      { from { opacity: 0; transform: translateY(8px); } }
 @keyframes alert-in    { from { opacity: 0; transform: scale(1.1); } }
 @keyframes alert-out   { to   { opacity: 0; transform: scale(0.95); } }
