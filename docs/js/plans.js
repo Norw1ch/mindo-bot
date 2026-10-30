@@ -431,6 +431,9 @@ views.main = (route) => {
         <button class="btn primary" data-act="new-section">➕ Новый раздел</button>
         <button class="btn" data-act="open-archive">🗄 Выполненные</button>
       </div>
+      <div class="group">
+        <button class="row" data-act="open-backup"><span class="title muted">Резервная копия</span>${CHEVRON}</button>
+      </div>
     </div>`;
 };
 

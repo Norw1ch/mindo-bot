@@ -58,9 +58,11 @@ const store = {
 // из общего хранилища. raw — все ключи и значения сразу
 
 const modules = {};
+let lastRaw = {}; // всё хранилище на момент последней загрузки — для резервной копии
 
 async function loadData() {
   const raw = await store.loadAll();
+  lastRaw = raw;
   Object.values(modules).forEach((m) => m.load(raw));
 }
 
