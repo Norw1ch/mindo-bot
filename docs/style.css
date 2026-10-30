@@ -312,6 +312,24 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .cal-day:active:not(:disabled) { transform: scale(0.86); transition-duration: .1s; }
 .cal-day.just.done { animation: check-pop .4s var(--soft); }
 
+/* ---------- Расходы ---------- */
+/* Серый кружок с первой буквой категории */
+.avatar {
+  flex: none; display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--field); color: var(--muted); font-size: 15px; font-weight: 600;
+}
+.meta.amount { color: var(--fg); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cat-bar { display: block; height: 4px; margin-top: 6px; border-radius: 2px; background: var(--field); overflow: hidden; }
+.cat-bar span { display: block; height: 100%; border-radius: 2px; background: var(--muted); }
+
+.total-card { margin-top: 18px; padding: 12px 12px 18px; border-radius: 20px; background: var(--cell); text-align: center; }
+.total-sum { display: block; margin-top: 6px; font-size: 36px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.total-sub { color: var(--muted); font-size: 14px; }
+
+/* Длинный список категорий в меню снизу прокручивается */
+#choice-opts { max-height: 60vh; overflow-y: auto; }
+
 /* ---------- Карточка идеи ---------- */
 .card { margin-top: 14px; padding: 18px 20px; border-radius: 20px; background: var(--cell); }
 .idea-text { white-space: pre-wrap; word-break: break-word; line-height: 1.45; }

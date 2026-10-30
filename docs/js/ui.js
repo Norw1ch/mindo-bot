@@ -351,7 +351,8 @@ function groupedPage(list, route, groupOf, rowOf) {
 // Поле <textarea class="inline-edit" data-edit="тип" data-id="…">: нажал — печатаешь, сохраняется само
 // через паузу в наборе и при уходе с поля. Модуль задаёт editors[тип]:
 //   get(id) — текущее значение, save(id, value) — записать (сначала меняет данные, потом сохраняет),
-//   required — пустым быть нельзя (вернём прежнее)
+//   required — пустым быть нельзя (вернём прежнее),
+//   valid(value) / invalidText — проверка (например, сумма); пока набираешь, неготовое значение пропускаем
 
 const editors = {};
 const editTimers = new Map(); // поле → таймер отложенного сохранения
@@ -370,11 +371,14 @@ async function flushEdit(el, final) {
   const { id } = el.dataset;
   const value = editValue(el);
   if (value === editor.get(id)) return;
-  if (!value && editor.required) {
+  const empty = !value && editor.required;
+  const invalid = value && editor.valid && !editor.valid(value);
+  if (empty || invalid) {
+    // Пока печатаешь — ждём; ушёл с поля — возвращаем прежнее значение
     if (final) {
       el.value = editor.get(id);
       autoGrow(el);
-      toast('Заголовок не может быть пустым');
+      toast(empty ? 'Пустым оставить нельзя — вернул прежнее' : editor.invalidText);
     }
     return;
   }
@@ -458,10 +462,12 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// HTML поля правки. multiline — многострочное (описание), иначе однострочное (заголовок)
-function editHtml(type, id, value, { placeholder = '', max = 80, multiline = false, cls = '' } = {}) {
+// HTML поля правки. multiline — многострочное (описание), иначе однострочное (заголовок).
+// inputmode: 'decimal' — цифровая клавиатура (для сумм)
+function editHtml(type, id, value, { placeholder = '', max = 80, multiline = false, cls = '', inputmode = '' } = {}) {
   return `<textarea class="inline-edit ${cls}" data-edit="${type}" data-id="${id}" rows="1"
     maxlength="${max}" placeholder="${placeholder}"${multiline ? ' data-multiline="1"' : ''}
+    ${inputmode ? `inputmode="${inputmode}"` : ''}
     enterkeyhint="${multiline ? 'enter' : 'done'}">${esc(value || '')}</textarea>`;
 }
 
@@ -664,7 +670,8 @@ let sheetInputs = [];
 let sheetResolve = null;
 let sheetTimer;
 
-// Показывает окно ввода с полями fields: [{ value, placeholder, max, multiline, optional }].
+// Показывает окно ввода с полями fields: [{ value, placeholder, max, multiline, optional, inputmode, check }].
+// inputmode: 'decimal' — цифровая клавиатура; check(value) — вернуть текст ошибки, если значение не подходит.
 // Возвращает массив введённых строк или null при отмене
 function ask({ title, fields }) {
   clearTimeout(sheetTimer);
@@ -678,6 +685,8 @@ function ask({ title, fields }) {
     el.rows = f.multiline ? 6 : 1;
     el.dataset.multiline = f.multiline ? '1' : '';
     el.dataset.optional = f.optional ? '1' : '';
+    if (f.inputmode) el.inputMode = f.inputmode;
+    el.check = f.check;
     el.addEventListener('keydown', onSheetKey);
     // Однострочное поле растёт по высоте, если текст длинный
     if (!f.multiline) el.addEventListener('input', () => autoGrow(el));
@@ -731,6 +740,15 @@ function saveSheet() {
     toast('Пусто');
     missing.focus();
     return;
+  }
+  // Проверка значений (например, что сумма — это число)
+  for (let i = 0; i < sheetInputs.length; i++) {
+    const problem = sheetInputs[i].check && values[i] && sheetInputs[i].check(values[i]);
+    if (problem) {
+      toast(problem);
+      sheetInputs[i].focus();
+      return;
+    }
   }
   closeSheet(values);
 }

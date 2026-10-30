@@ -170,8 +170,7 @@ function calendarHtml(h, route) {
   const today = dayNum();
   const offset = (shown.getDay() + 6) % 7; // с понедельника
   const daysIn = new Date(y, m + 1, 0).getDate();
-  let title = shown.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }).replace(' г.', '');
-  title = title[0].toUpperCase() + title.slice(1);
+  const title = monthTitle(shown);
 
   const cells = [];
   for (let i = 0; i < offset; i++) cells.push('<span></span>');

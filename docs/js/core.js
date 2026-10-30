@@ -242,6 +242,12 @@ function stepRepeat(key, rep, anchor) {
   return dayKey(date);
 }
 
+// «Октябрь 2026»
+function monthTitle(date) {
+  const text = date.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }).replace(' г.', '');
+  return text[0].toUpperCase() + text.slice(1);
+}
+
 // Коротко: «Сегодня», «Завтра», «Вчера», иначе «5 нояб.»
 function dayLabel(key) {
   const today = dayKey();
