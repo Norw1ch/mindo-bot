@@ -179,16 +179,19 @@ function updateStats(inner, h) {
 }
 
 // Календарь месяца: route.month — сдвиг от текущего месяца (0 — этот, -1 — прошлый)
-function calendarHtml(h, route) {
+function shownMonth(route) {
   const now = new Date();
-  const shown = new Date(now.getFullYear(), now.getMonth() + (route.month || 0), 1);
+  return new Date(now.getFullYear(), now.getMonth() + (route.month || 0), 1);
+}
+
+// Числа месяца (сетка Пн–Вс)
+function calCellsHtml(h, route) {
+  const shown = shownMonth(route);
   const y = shown.getFullYear();
   const m = shown.getMonth();
   const today = dayNum();
   const offset = (shown.getDay() + 6) % 7; // с понедельника
   const daysIn = new Date(y, m + 1, 0).getDate();
-  const title = monthTitle(shown);
-
   const cells = [];
   for (let i = 0; i < offset; i++) cells.push('<span></span>');
   for (let d = 1; d <= daysIn; d++) {
@@ -196,16 +199,58 @@ function calendarHtml(h, route) {
     const cls = `${isDone(h, num) ? ' done' : ''}${num === today ? ' today' : ''}${isScheduled(h, num) ? '' : ' off'}`;
     cells.push(`<button class="cal-day${cls}" data-act="toggle-habit-day" data-id="${h.id}" data-day="${num}"${num > today ? ' disabled' : ''}>${d}</button>`);
   }
+  return cells.join('');
+}
+
+// Заголовок со стрелками и дни недели стоят на месте, перелистывается только сетка чисел
+function calendarHtml(h, route) {
   return `
-    <div class="page-items">
-      <div class="cal-head">
-        <button class="pager-btn prev" data-act="habit-month" data-dir="-1">${CHEVRON}</button>
-        <span class="cal-title">${title}</span>
-        <button class="pager-btn" data-act="habit-month" data-dir="1"${(route.month || 0) >= 0 ? ' disabled' : ''}>${CHEVRON}</button>
-      </div>
-      <div class="cal-week">${WEEKDAYS.map((d) => `<span>${d}</span>`).join('')}</div>
-      <div class="cal-grid">${cells.join('')}</div>
-    </div>`;
+    <div class="cal-head">
+      <button class="pager-btn prev" data-act="habit-month" data-dir="-1">${CHEVRON}</button>
+      <span class="cal-title">${monthTitle(shownMonth(route))}</span>
+      <button class="pager-btn" data-act="habit-month" data-dir="1"${(route.month || 0) >= 0 ? ' disabled' : ''}>${CHEVRON}</button>
+    </div>
+    <div class="cal-week">${WEEKDAYS.map((d) => `<span>${d}</span>`).join('')}</div>
+    <div class="cal-viewport"><div class="cal-grid">${calCellsHtml(h, route)}</div></div>`;
+}
+
+// Перелистывание месяца: старая сетка целиком уезжает в сторону, новая въезжает с другой,
+// высота плавно подстраивается (в месяце бывает 5 или 6 недель). Без проявления и размытия
+const CAL_SLIDE = { duration: 420, easing: 'cubic-bezier(.32, .72, 0, 1)' };
+
+function slideCalendar(cal, h, route, dir) {
+  if (cal.slideDone) cal.slideDone(); // прошлое перелистывание ещё идёт — завершаем сразу
+  cal.querySelector('.cal-title').textContent = monthTitle(shownMonth(route));
+  cal.querySelector('[data-dir="1"]').disabled = (route.month || 0) >= 0;
+
+  const viewport = cal.querySelector('.cal-viewport');
+  const old = viewport.querySelector('.cal-grid');
+  const fresh = document.createElement('div');
+  fresh.className = 'cal-grid';
+  fresh.innerHTML = calCellsHtml(h, route);
+  if (reduceMotion || !viewport.animate) {
+    old.replaceWith(fresh);
+    return;
+  }
+
+  const from = viewport.offsetHeight;
+  fresh.classList.add('sliding'); // на время перелистывания новая сетка лежит поверх, рядом со старой
+  viewport.append(fresh);
+  const to = fresh.offsetHeight;
+  const away = dir > 0 ? '-100%' : '100%';
+  const enter = dir > 0 ? '100%' : '-100%';
+  const anims = [
+    old.animate([{ transform: 'translateX(0)' }, { transform: `translateX(${away})` }], { ...CAL_SLIDE, fill: 'forwards' }),
+    fresh.animate([{ transform: `translateX(${enter})` }, { transform: 'translateX(0)' }], CAL_SLIDE),
+    viewport.animate([{ height: `${from}px` }, { height: `${to}px` }], CAL_SLIDE),
+  ];
+  cal.slideDone = () => {
+    cal.slideDone = null;
+    old.remove();
+    fresh.classList.remove('sliding');
+    anims.forEach((a) => a.cancel());
+  };
+  anims[1].onfinish = () => { if (cal.slideDone) cal.slideDone(); };
 }
 
 // ---------- Экраны ----------
@@ -228,7 +273,7 @@ views.habit = (route) => {
     <h1>${editHtml('habit-name', h.id, h.name, { placeholder: 'Название', max: HABIT_NAME_MAX })}</h1>
     <p class="sub">С ${formatDate(h.at)}</p>
     <div class="stats">${statsHtml(h)}</div>
-    <div class="cal paged">${calendarHtml(h, route)}</div>
+    <div class="cal">${calendarHtml(h, route)}</div>
     <div class="group">
       <button class="row" data-act="habit-days" data-id="${h.id}">
         <span class="title">Дни</span>
@@ -331,12 +376,11 @@ Object.assign(actions, {
     else if (Number(day) === dayNum()) cheer(h);
   },
 
-  // Листание месяцев: новый месяц въезжает справа или слева
+  // Листание месяцев: старый уезжает в сторону, новый въезжает с другой
   'habit-month': ({ dir }, el) => {
     const route = currentRoute();
     route.month = (route.month || 0) + Number(dir);
-    const box = el.closest('.cal');
-    swapContent(box, calendarHtml(habits.find(route.id), route), Number(dir) > 0 ? 'page-next' : 'page-prev');
+    slideCalendar(el.closest('.cal'), habits.find(route.id), route, Number(dir));
     softHaptic();
   },
 

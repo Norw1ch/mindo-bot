@@ -321,6 +321,9 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; }
 .cal-week { margin-bottom: 6px; color: var(--muted); font-size: 12px; }
 .cal-grid { row-gap: 6px; }
+/* Окно, в котором перелистываются месяцы: всё, что уехало за края, не видно */
+.cal-viewport { position: relative; overflow: hidden; padding: 4px 0; margin: -4px 0; } /* запас — чтобы «пружинка» отмеченного дня не обрезалась */
+.cal-grid.sliding { position: absolute; top: 4px; left: 0; right: 0; }
 .cal-day {
   justify-self: center; display: flex; align-items: center; justify-content: center;
   width: 38px; height: 38px; border-radius: 50%; font-size: 15px;
