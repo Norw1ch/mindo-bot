@@ -253,6 +253,22 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
   cursor: text; -webkit-appearance: none; appearance: none;
 }
 .inline-edit::placeholder { color: var(--faint); }
+/* «Готово» в правом верхнем углу, пока правишь текст */
+.done-btn {
+  position: fixed; z-index: 9; top: 12px; right: 16px;
+  padding: 9px 18px; border-radius: 999px;
+  background: var(--inv-bg); color: var(--inv-fg);
+  font-size: 15px; font-weight: 600;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  opacity: 0; visibility: hidden; transform: translateY(-10px) scale(0.92);
+  transition: opacity .25s ease, transform .4s var(--soft), visibility 0s linear .4s;
+}
+.done-btn.show {
+  opacity: 1; visibility: visible; transform: none;
+  transition: opacity .25s ease, transform .4s var(--soft);
+}
+.done-btn:active { transform: scale(0.94); transition-duration: .1s; }
+
 /* Пока пишешь в карточке — лёгкая рамка, чтобы было видно, что идёт правка */
 .card { transition: box-shadow .25s ease; }
 .card:focus-within { box-shadow: 0 0 0 2px var(--field); }

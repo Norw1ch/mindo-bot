@@ -403,7 +403,39 @@ document.addEventListener('input', (e) => {
   editTimers.set(el, setTimeout(() => flushEdit(el, false), EDIT_DELAY));
 });
 document.addEventListener('focusout', (e) => {
-  if (e.target.classList.contains('inline-edit')) flushEdit(e.target, true);
+  if (!e.target.classList.contains('inline-edit')) return;
+  flushEdit(e.target, true);
+  // Прячем «Готово» с задержкой: если фокус перешёл в соседнее поле, кнопка останется
+  doneTimer = setTimeout(() => doneBtn.classList.remove('show'), 150);
+});
+
+// Кнопка «Готово»: сохранить и спрятать клавиатуру. Пока правишь — висит в правом верхнем углу
+const doneBtn = document.getElementById('done-btn');
+let doneTimer;
+
+// Держим кнопку в видимой части экрана: на iPhone с клавиатурой страница может сдвигаться вверх
+function placeDoneBtn() {
+  const vv = window.visualViewport;
+  doneBtn.style.top = `${(vv ? vv.offsetTop : 0) + 12}px`;
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', placeDoneBtn);
+  window.visualViewport.addEventListener('scroll', placeDoneBtn);
+}
+
+document.addEventListener('focusin', (e) => {
+  if (!e.target.classList.contains('inline-edit')) return;
+  clearTimeout(doneTimer);
+  placeDoneBtn();
+  doneBtn.classList.add('show');
+});
+// Нажатие не забирает фокус у поля — иначе кнопка начала бы исчезать прямо под пальцем
+doneBtn.addEventListener('pointerdown', (e) => e.preventDefault());
+doneBtn.addEventListener('click', () => {
+  const el = document.activeElement;
+  if (el && el.classList.contains('inline-edit')) el.blur(); // уход с поля сохраняет текст
+  softHaptic();
+  toast('Сохранено');
 });
 // Enter в однострочном поле (заголовке) убирает клавиатуру
 document.addEventListener('keydown', (e) => {
