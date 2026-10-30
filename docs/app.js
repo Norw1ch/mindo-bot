@@ -53,7 +53,8 @@ const store = {
 
 // ---------- Данные ----------
 // sections: [{id, name}] — в ключе "sections"
-// ideas: {id, sec, title, text, st, at} — каждая идея в своём ключе "i_<id>"
+// ideas: {id, sec, title, text, st, at, dt} — каждая идея в своём ключе "i_<id>"
+//   st — статус (new / wip / done), at — когда создана, dt — когда выполнена
 
 const data = { sections: [], ideas: [] };
 
@@ -100,11 +101,12 @@ function findIdea(id) {
   return data.ideas.find((i) => i.id === id);
 }
 
-// Активные идеи раздела (не Done), новые сверху
-function sectionIdeas(sectionId) {
+// Идеи раздела по фильтру: all — активные (не Done), иначе — с этим статусом.
+// Новые сверху; выполненные — по дате выполнения
+function filteredIdeas(sectionId, filter) {
   return data.ideas
-    .filter((i) => i.sec === sectionId && i.st !== 'done')
-    .sort((a, b) => b.at - a.at);
+    .filter((i) => i.sec === sectionId && (filter === 'all' ? i.st !== 'done' : i.st === filter))
+    .sort((a, b) => (filter === 'done' ? (b.dt || 0) - (a.dt || 0) : b.at - a.at));
 }
 
 function saveSections() {
@@ -140,17 +142,20 @@ function confirmDeleteSection(id) {
 }
 
 // Выполняет изменение и сохранение. При ошибке перечитывает данные, чтобы экран не врал.
-// after — что сделать потом: по умолчанию обновить текущий экран
+// after — что сделать потом: по умолчанию обновить текущий экран. Возвращает true, если сохранилось
 async function commit(change, after = refresh) {
+  let ok = true;
   try {
     await change();
     haptic();
   } catch (err) {
     console.error(err);
+    ok = false;
     toast('Не удалось сохранить');
     await loadData().catch(() => {});
   }
   await after();
+  return ok;
 }
 
 // ---------- Навигация ----------
@@ -259,6 +264,57 @@ const STATUS = {
   done: { icon: '⚫', label: 'Done' },
 };
 
+// Сегменты переключателя статуса в карточке
+const STATUS_ITEMS = Object.entries(STATUS).map(([key, s]) => (
+  { key, html: `<span class="ic">${s.icon}</span>${s.label}` }
+));
+
+// Фильтры в разделе
+const FILTERS = [
+  { key: 'all', html: 'Все' },
+  { key: 'new', html: 'Not started' },
+  { key: 'wip', html: 'In progress' },
+  { key: 'done', html: 'Done' },
+];
+
+// Переключатель в стиле iOS: «таблетка» под выбранным сегментом.
+// extra — дополнительные атрибуты для кнопок (например, data-id)
+function segHtml(items, activeKey, act, extra = '', cls = '') {
+  const k = items.findIndex((i) => i.key === activeKey);
+  const buttons = items.map((i) => `
+    <button class="seg-btn${i.key === activeKey ? ' active' : ''}" data-act="${act}" data-key="${i.key}"${extra}>${i.html}</button>`).join('');
+  return `<div class="seg ${cls}" style="--n:${items.length};--k:${k}"><span class="seg-pill"></span>${buttons}</div>`;
+}
+
+// Плавно переносит «таблетку» на другой сегмент, не перерисовывая экран
+function moveSeg(seg, key) {
+  const buttons = [...seg.querySelectorAll('.seg-btn')];
+  seg.style.setProperty('--k', buttons.findIndex((b) => b.dataset.key === key));
+  buttons.forEach((b) => b.classList.toggle('active', b.dataset.key === key));
+}
+
+function ideaListHtml(sectionId, filter) {
+  const ideas = filteredIdeas(sectionId, filter);
+  if (!ideas.length) {
+    return `<p class="empty small">${filter === 'all' ? 'Планов пока нет' : 'Здесь пусто'}</p>`;
+  }
+  const rows = ideas.map((idea, n) => `
+    <div class="swipe${takeFlash(idea.id) ? ' appear' : ''}" style="--i:${n}">
+      <button class="swipe-del" data-act="swipe-delete" data-kind="idea" data-id="${idea.id}">Удалить</button>
+      <button class="row" data-act="open-idea" data-id="${idea.id}">
+        <span class="st">${STATUS[idea.st].icon}</span>
+        <span class="title">${esc(idea.title)}</span>
+        ${CHEVRON}
+      </button>
+    </div>`).join('');
+  return `<div class="group">${rows}</div>`;
+}
+
+function dateLine(idea) {
+  const done = idea.st === 'done' && idea.dt ? ` · выполнен ${formatDate(idea.dt)}` : '';
+  return `Создан ${formatDate(idea.at)}${done}`;
+}
+
 views.main = () => {
   const rows = data.sections.map((s, n) => `
     <div class="swipe${takeFlash(s.id) ? ' appear' : ''}" style="--i:${n}">
@@ -284,24 +340,17 @@ views.section = (route) => {
   const s = findSection(route.id);
   if (!s) return '<p class="empty">Раздел не найден</p>';
 
-  const ideas = sectionIdeas(s.id);
-  const rows = ideas.map((idea, n) => `
-    <div class="swipe${takeFlash(idea.id) ? ' appear' : ''}" style="--i:${n}">
-      <button class="swipe-del" data-act="swipe-delete" data-kind="idea" data-id="${idea.id}">Удалить</button>
-      <button class="row" data-act="open-idea" data-id="${idea.id}">
-        <span class="st">${STATUS[idea.st].icon}</span>
-        <span class="title">${esc(idea.title)}</span>
-        ${CHEVRON}
-      </button>
-    </div>`).join('');
+  const filter = route.filter || 'all';
+  const active = filteredIdeas(s.id, 'all').length;
 
   return `
     <h1${takeFlash(s.id) ? ' class="swap"' : ''}>${esc(s.name)}</h1>
-    <p class="sub">${ideas.length ? plural(ideas.length, ['план', 'плана', 'планов']) : 'Планов пока нет'}</p>
+    <p class="sub">${active ? plural(active, ['план', 'плана', 'планов']) + ' в работе' : 'Активных планов нет'}</p>
     <div class="actions">
       <button class="btn primary" data-act="add-idea" data-id="${s.id}">➕ Новый план</button>
     </div>
-    ${rows ? `<div class="group">${rows}</div>` : ''}
+    ${segHtml(FILTERS, filter, 'set-filter')}
+    <div class="ideas">${ideaListHtml(s.id, filter)}</div>
     <div class="group">
       <button class="row" data-act="rename-section" data-id="${s.id}">Переименовать</button>
       <button class="row danger" data-act="delete-section" data-id="${s.id}">Удалить раздел</button>
@@ -312,7 +361,6 @@ views.idea = (route) => {
   const idea = findIdea(route.id);
   if (!idea) return '<p class="empty">План не найден</p>';
   const section = findSection(idea.sec);
-  const st = STATUS[idea.st];
   const swap = takeFlash(idea.id) ? ' swap' : '';
   const text = idea.text
     ? `<p class="idea-text">${esc(idea.text)}</p>`
@@ -321,10 +369,10 @@ views.idea = (route) => {
   return `
     <h1 class="${swap}">${esc(idea.title)}</h1>
     <p class="sub">${section ? esc(section.name) : ''}</p>
+    ${segHtml(STATUS_ITEMS, idea.st, 'set-status', ` data-id="${idea.id}"`, 'big')}
     <div class="card${swap}">
-      <p class="status">${st.icon} ${st.label}</p>
       ${text}
-      <p class="date">Создан ${formatDate(idea.at)}</p>
+      <p class="date">${dateLine(idea)}</p>
     </div>
     <div class="group">
       <button class="row" data-act="edit-idea" data-id="${idea.id}">Изменить</button>
@@ -400,6 +448,9 @@ const actions = {
     const [title, text] = res;
     const idea = { id: newId(), sec: id, title, text, st: 'new', at: Date.now() };
     flash = idea.id;
+    // Новый план — Not started. Если открыт фильтр, где его не видно, переключаемся на «Все»
+    const route = stack[stack.length - 1];
+    if (route.filter === 'wip' || route.filter === 'done') route.filter = 'all';
     await commit(() => {
       data.ideas.push(idea);
       return saveIdea(idea);
@@ -407,6 +458,39 @@ const actions = {
   },
 
   'open-idea': ({ id }) => go({ name: 'idea', id }),
+
+  // Фильтр в разделе: таблетка переезжает, список мягко обновляется
+  'set-filter': ({ key }, el) => {
+    const route = stack[stack.length - 1];
+    if ((route.filter || 'all') === key) return;
+    route.filter = key;
+    closeSwipe(false);
+    moveSeg(el.closest('.seg'), key);
+    const box = el.closest('.screen-inner').querySelector('.ideas');
+    box.innerHTML = ideaListHtml(route.id, key);
+    box.classList.remove('list-swap');
+    void box.offsetWidth; // перезапуск анимации
+    box.classList.add('list-swap');
+  },
+
+  // Статус в карточке: сохраняем сразу, экран не перерисовываем, чтобы таблетка плавно переехала
+  'set-status': async ({ id, key }, el) => {
+    const idea = findIdea(id);
+    if (!idea || idea.st === key) return;
+    const inner = el.closest('.screen-inner');
+    moveSeg(el.closest('.seg'), key);
+    const ok = await commit(() => {
+      idea.st = key;
+      idea.dt = key === 'done' ? Date.now() : null;
+      return saveIdea(idea);
+    }, () => {});
+    if (!ok) {
+      refresh();
+      return;
+    }
+    inner.querySelector('.date').innerHTML = dateLine(idea);
+    if (key === 'done') toast('Перенесено в «Выполненные»');
+  },
 
   'edit-idea': async ({ id }) => {
     const idea = findIdea(id);
