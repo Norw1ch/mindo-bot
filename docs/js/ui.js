@@ -14,10 +14,16 @@ const CHEVRON = '<svg class="chev" width="8" height="13" viewBox="0 0 8 13" aria
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// Что мягко подсветить при следующей отрисовке (новая строка, новое имя)
+// Что мягко подсветить при следующей отрисовке (новая строка, новое имя).
+// Одно значение или Set — если новых строк сразу несколько
 let flash = null;
 
 function takeFlash(id) {
+  if (flash instanceof Set) {
+    if (!flash.delete(id)) return false;
+    if (!flash.size) flash = null;
+    return true;
+  }
   if (flash !== id) return false;
   flash = null;
   return true;
@@ -33,7 +39,7 @@ async function commit(change, after = refresh) {
   } catch (err) {
     console.error(err);
     ok = false;
-    toast('Не удалось сохранить');
+    toast(err.userMessage || 'Не удалось сохранить'); // userMessage — понятное объяснение от модуля
     await loadData().catch(() => {});
   }
   await after();

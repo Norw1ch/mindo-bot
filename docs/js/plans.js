@@ -6,15 +6,17 @@
 
 // ---------- Данные ----------
 // sections: [{id, name}] — в ключе "sections"
-// ideas: {id, sec, title, text, st, at, dt, due} — каждый план в своём ключе "i_<id>"
+// ideas: {id, sec, title, text, st, at, dt, due, items} — каждый план в своём ключе "i_<id>"
 //   st — статус (new / wip / done), at — когда создан, dt — когда выполнен,
-//   due — срок «2026-10-30» или пусто
+//   due — срок «2026-10-30» или пусто, items — чеклист [{id, t: текст, d: отмечен}]
 
 const data = { sections: [], ideas: [] };
 
 const SECTION_MAX = 50;
 const TITLE_MAX = 80;
 const IDEA_MAX = 3000; // в облаке Telegram на одну запись — до 4096 символов
+const ITEM_MAX = 120;  // пункт чеклиста
+const RECORD_MAX = 4000; // весь план целиком (с запасом до лимита Telegram)
 
 modules.plans = {
   load(raw) {
@@ -77,7 +79,19 @@ function saveSections() {
 }
 
 function saveIdea(idea) {
-  return store.set('i_' + idea.id, JSON.stringify(idea));
+  const json = JSON.stringify(idea);
+  if (json.length > RECORD_MAX) {
+    const err = new Error('record too big');
+    err.userMessage = 'Слишком много текста в плане';
+    return Promise.reject(err);
+  }
+  return store.set('i_' + idea.id, json);
+}
+
+// Чеклист: сколько отмечено и всего
+function itemsProgress(idea) {
+  const items = idea.items || [];
+  return { done: items.filter((i) => i.d).length, total: items.length };
 }
 
 async function deleteIdeaData(id) {
@@ -106,6 +120,16 @@ function confirmDeleteSection(id) {
 
 deleters.idea = { confirm: confirmDeleteIdea, remove: deleteIdeaData };
 deleters.section = { confirm: confirmDeleteSection, remove: deleteSectionData };
+// Пункт чеклиста удаляется сразу, без вопроса. id — «план:пункт»
+deleters.item = {
+  confirm: async () => true,
+  remove: (key) => {
+    const [ideaId, itemId] = key.split(':');
+    const idea = findIdea(ideaId);
+    idea.items = idea.items.filter((i) => i.id !== itemId);
+    return saveIdea(idea);
+  },
+};
 
 // ---------- Отображение ----------
 
@@ -143,11 +167,54 @@ function ideaListHtml(route) {
       <button class="row" data-act="open-idea" data-id="${idea.id}">
         <span class="st">${STATUS[idea.st].icon}</span>
         <span class="title">${esc(idea.title)}</span>
+        ${itemsMeta(idea)}
         ${dueMeta(idea)}
         ${CHEVRON}
       </button>
     </div>`).join('');
   return `<div class="page-items"><div class="group">${rows}</div></div>${pagerHtml(p)}`;
+}
+
+// Прогресс чеклиста справа в строке: «2/5»
+function itemsMeta(idea) {
+  const { done, total } = itemsProgress(idea);
+  return total ? `<span class="meta small">${done}/${total}</span>` : '';
+}
+
+const CHECK = '<span class="check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.5 12.5 3.5 3.5 7.5-8"/></svg></span>';
+
+// Заголовок чеклиста: «Чеклист · 2 из 5» и полоска прогресса
+function checklistHead(idea) {
+  const { done, total } = itemsProgress(idea);
+  if (!total) return '<p class="group-head">Чеклист</p>';
+  return `
+    <p class="group-head with-bar">
+      <span class="ch-label">Чеклист · ${done} из ${total}</span>
+      <span class="bar"><span style="width:${(done / total) * 100}%"></span></span>
+    </p>`;
+}
+
+// Чеклист в карточке: пункты (нажатие — отметить, свайп — удалить) и «Добавить пункт»
+function checklistHtml(idea) {
+  const rows = (idea.items || []).map((it, n) => `
+    <div class="swipe${takeFlash(it.id) ? ' appear' : ''}" style="--i:${n}">
+      <button class="swipe-del" data-act="swipe-delete" data-kind="item" data-id="${idea.id}:${it.id}">Удалить</button>
+      <button class="row check-row${it.d ? ' checked' : ''}" data-act="toggle-item" data-id="${idea.id}" data-item="${it.id}">
+        ${CHECK}
+        <span class="title wrap">${esc(it.t)}</span>
+      </button>
+    </div>`).join('');
+  return `
+    <div class="checklist">
+      ${checklistHead(idea)}
+      <div class="group">
+        ${rows}
+        <button class="row add-row" data-act="add-items" data-id="${idea.id}">
+          <span class="plus">+</span>
+          <span class="title">Добавить пункт</span>
+        </button>
+      </div>
+    </div>`;
 }
 
 // Срок справа в строке: «Завтра», «5 нояб.»; просроченный — красным
@@ -306,6 +373,7 @@ views.idea = (route) => {
     <div class="actions restore${idea.st === 'done' ? '' : ' hidden'}">
       <button class="btn primary" data-act="restore-idea" data-id="${idea.id}">↺ Вернуть в работу</button>
     </div>
+    ${checklistHtml(idea)}
     <div class="group">
       <button class="row" data-act="set-due" data-id="${idea.id}">
         <span class="title">Срок</span>
@@ -465,6 +533,45 @@ Object.assign(actions, {
   'open-archive': () => go({ name: 'archive' }),
 
   'open-agenda': () => go({ name: 'agenda' }),
+
+  // Добавить пункты чеклиста: каждая строка — отдельный пункт
+  'add-items': async ({ id }) => {
+    const idea = findIdea(id);
+    const res = await ask({
+      title: 'Новые пункты',
+      fields: [{ placeholder: 'Каждая строка — отдельный пункт', max: 2000, multiline: true }],
+    });
+    if (!res) return;
+    const items = res[0].split('\n')
+      .map((line) => line.trim().slice(0, ITEM_MAX))
+      .filter(Boolean)
+      .map((t) => ({ id: newId() + Math.random().toString(36).slice(2, 4), t, d: false }));
+    if (!items.length) return;
+    flash = new Set(items.map((i) => i.id));
+    await commit(() => {
+      idea.items = [...(idea.items || []), ...items];
+      return saveIdea(idea);
+    });
+  },
+
+  // Отметить пункт: кружок заливается на месте, заголовок и полоска обновляются без перерисовки
+  'toggle-item': async ({ id, item }, el) => {
+    const idea = findIdea(id);
+    const it = idea.items.find((i) => i.id === item);
+    it.d = !it.d;
+    el.classList.add('just');
+    el.classList.toggle('checked', it.d);
+    const box = el.closest('.checklist');
+    const { done, total } = itemsProgress(idea);
+    box.querySelector('.ch-label').textContent = `Чеклист · ${done} из ${total}`;
+    box.querySelector('.bar span').style.width = `${(done / total) * 100}%`;
+    const ok = await commit(() => saveIdea(idea), () => {});
+    if (!ok) {
+      refresh();
+      return;
+    }
+    if (it.d && done === total && idea.st !== 'done') toast('Все пункты готовы — можно отметить ⚫ Done');
+  },
 
   // Срок: быстрые варианты, календарь или «Убрать срок»
   'set-due': async ({ id }) => {

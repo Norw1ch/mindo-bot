@@ -183,6 +183,39 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .paged.page-next .page-items { animation: page-next .45s var(--soft) both; }
 .paged.page-prev .page-items { animation: page-prev .45s var(--soft) both; }
 
+/* ---------- Чеклист ---------- */
+.group-head.with-bar { display: flex; align-items: center; gap: 12px; }
+.bar { flex: 1; height: 4px; border-radius: 2px; background: var(--field); overflow: hidden; }
+.bar span { display: block; height: 100%; border-radius: 2px; background: var(--muted); transition: width .5s var(--soft); }
+
+.check {
+  flex: none; display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 1.5px solid var(--faint);
+  transition: background-color .25s ease, border-color .25s ease;
+}
+.check svg {
+  width: 16px; height: 16px; fill: none; stroke: var(--inv-fg); stroke-width: 2.6;
+  stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 18; stroke-dashoffset: 18; /* галочка «рисуется» при отметке */
+  transition: stroke-dashoffset .3s ease .08s;
+}
+.checked .check { background: var(--inv-bg); border-color: var(--inv-bg); }
+.checked .check svg { stroke-dashoffset: 0; }
+.check-row.just.checked .check { animation: check-pop .4s var(--soft); }
+.check-row .title { transition: color .3s ease; }
+.checked .title { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--faint); }
+.row .title.wrap { white-space: normal; word-break: break-word; }
+
+.add-row { color: var(--muted); }
+.add-row .plus { flex: none; width: 24px; text-align: center; font-size: 22px; line-height: 1; font-weight: 300; }
+.swipe + .row::before {
+  content: ''; position: absolute; top: 0; left: 18px; right: 0;
+  height: 0.5px; background: var(--sep);
+}
+
+@keyframes check-pop { 50% { transform: scale(1.18); } }
+
 /* ---------- Карточка идеи ---------- */
 .card { margin-top: 14px; padding: 18px 20px; border-radius: 20px; background: var(--cell); }
 .idea-text { white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
