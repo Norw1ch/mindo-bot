@@ -86,6 +86,21 @@ function saveSections() {
   return store.set('sections', JSON.stringify(data.sections));
 }
 
+// Удаляет раздел вместе с его идеями: сначала идеи, потом сам раздел
+async function deleteSectionData(id) {
+  for (const idea of data.ideas.filter((i) => i.sec === id)) await store.remove('i_' + idea.id);
+  data.ideas = data.ideas.filter((i) => i.sec !== id);
+  data.sections = data.sections.filter((s) => s.id !== id);
+  await saveSections();
+}
+
+function confirmDeleteSection(id) {
+  const s = findSection(id);
+  const count = data.ideas.filter((i) => i.sec === id).length;
+  const extra = count ? `\nВместе с ним удалятся идеи: ${count}.` : '';
+  return confirmDialog(`Удалить раздел «${s.name}»?${extra}`);
+}
+
 // Выполняет изменение и сохранение. При ошибке перечитывает данные, чтобы экран не врал.
 // after — что сделать потом: по умолчанию обновить текущий экран
 async function commit(change, after = refresh) {
@@ -135,6 +150,7 @@ function makeShade() {
 async function go(route) {
   if (busy) return;
   busy = true;
+  closeSwipe(false);
   stack.push(route);
   const under = screens[screens.length - 1];
   const top = makeScreen(stack.length - 1);
@@ -185,20 +201,37 @@ async function back() {
 
 const views = {};
 
+const CHEVRON = '<svg class="chev" width="8" height="13" viewBox="0 0 8 13" aria-hidden="true">'
+  + '<path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2"'
+  + ' stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+// Что мягко подсветить при следующей отрисовке (новый раздел, новое имя)
+let flash = null;
+
+function takeFlash(id) {
+  if (flash !== id) return false;
+  flash = null;
+  return true;
+}
+
 views.main = () => {
   const rows = data.sections.map((s, n) => `
-    <button class="row" style="--i:${n}" data-act="open-section" data-id="${s.id}">
-      <span class="title">${esc(s.name)}</span>
-      <span class="meta">${activeCount(s.id)}</span>
-    </button>`).join('');
+    <div class="swipe${takeFlash(s.id) ? ' appear' : ''}" style="--i:${n}">
+      <button class="swipe-del" data-act="swipe-delete" data-id="${s.id}">Удалить</button>
+      <button class="row" data-act="open-section" data-id="${s.id}">
+        <span class="title">${esc(s.name)}</span>
+        <span class="meta">${activeCount(s.id)}</span>
+        ${CHEVRON}
+      </button>
+    </div>`).join('');
 
   return `
     <h1>Журнал идей</h1>
     <p class="sub">${data.sections.length ? 'Выбери раздел' : 'Разделов пока нет'}</p>
-    ${rows ? `<div class="list">${rows}</div>` : ''}
+    ${rows ? `<div class="group">${rows}</div>` : ''}
     <div class="actions">
-      <button class="btn" data-act="new-section">➕ Новый раздел</button>
-      <button class="btn quiet" data-act="open-archive">🗄 Архив Done</button>
+      <button class="btn primary" data-act="new-section">➕ Новый раздел</button>
+      <button class="btn" data-act="open-archive">🗄 Архив Done</button>
     </div>`;
 };
 
@@ -207,14 +240,14 @@ views.section = (route) => {
   if (!s) return '<p class="empty">Раздел не найден</p>';
 
   return `
-    <h1>${esc(s.name)}</h1>
+    <h1${takeFlash(s.id) ? ' class="swap"' : ''}>${esc(s.name)}</h1>
     <p class="sub">Идей пока нет</p>
     <div class="actions">
       <button class="btn primary" data-act="add-idea">➕ Добавить идею</button>
     </div>
-    <div class="tools">
-      <button class="link" data-act="rename-section" data-id="${s.id}">✎ Переименовать</button>
-      <button class="link" data-act="delete-section" data-id="${s.id}">× Удалить</button>
+    <div class="group">
+      <button class="row" data-act="rename-section" data-id="${s.id}">Переименовать</button>
+      <button class="row danger" data-act="delete-section" data-id="${s.id}">Удалить раздел</button>
     </div>`;
 };
 
@@ -230,8 +263,10 @@ const actions = {
   'new-section': async () => {
     const name = await ask({ title: 'Новый раздел', placeholder: 'Название', max: SECTION_MAX });
     if (!name) return;
+    const id = newId();
+    flash = id;
     await commit(() => {
-      data.sections.push({ id: newId(), name });
+      data.sections.push({ id, name });
       return saveSections();
     });
   },
@@ -240,25 +275,28 @@ const actions = {
     const s = findSection(id);
     const name = await ask({ title: 'Переименовать раздел', value: s.name, max: SECTION_MAX });
     if (!name || name === s.name) return;
+    flash = id;
     await commit(() => {
       s.name = name;
       return saveSections();
     });
   },
 
+  // Удаление с экрана раздела
   'delete-section': async ({ id }) => {
-    const s = findSection(id);
-    const ideas = data.ideas.filter((i) => i.sec === id);
-    const extra = ideas.length ? `\nВместе с ним удалятся идеи: ${ideas.length}.` : '';
-    if (!(await confirmDialog(`Удалить раздел «${s.name}»?${extra}`))) return;
+    if (!(await confirmDeleteSection(id))) return;
+    await commit(() => deleteSectionData(id), back); // потом возвращаемся на главный экран
+  },
 
-    await commit(async () => {
-      // Сначала идеи, потом сам раздел
-      for (const idea of ideas) await store.remove('i_' + idea.id);
-      data.ideas = data.ideas.filter((i) => i.sec !== id);
-      data.sections = data.sections.filter((x) => x.id !== id);
-      await saveSections();
-    }, back); // после удаления возвращаемся на главный экран
+  // Удаление свайпом на главном экране
+  'swipe-delete': async ({ id }, el) => {
+    if (!(await confirmDeleteSection(id))) {
+      closeSwipe();
+      return;
+    }
+    openSwipe = null;
+    await collapse(el.closest('.swipe'));
+    await commit(() => deleteSectionData(id));
   },
 
   // Заглушки: появятся на следующих этапах
@@ -267,11 +305,101 @@ const actions = {
 };
 
 document.addEventListener('click', (e) => {
+  if (suppressClick) {
+    suppressClick = false; // это был свайп или закрытие кнопки, а не нажатие
+    return;
+  }
   const el = e.target.closest('[data-act]');
   if (!el || busy) return;
   const action = actions[el.dataset.act];
   if (action) action(el.dataset, el);
 });
+
+// ---------- Свайп влево для удаления ----------
+
+const SWIPE_OPEN = 96; // насколько сдвигается строка, чтобы открыть кнопку
+let openSwipe = null;  // строка с открытой кнопкой
+let drag = null;       // текущее движение пальцем
+let pendingClose = false;
+let suppressClick = false;
+
+// Сдвигает строку на x пикселей; кнопка проявляется по мере сдвига
+function setSwipe(wrap, x, animate) {
+  const row = wrap.querySelector('.row');
+  const del = wrap.querySelector('.swipe-del');
+  const p = Math.min(1, -x / SWIPE_OPEN);
+  row.classList.toggle('settling', animate);
+  del.classList.toggle('settling', animate);
+  row.style.transform = x ? `translateX(${x}px)` : '';
+  del.style.opacity = p;
+  del.style.transform = `scale(${0.6 + 0.4 * p})`;
+}
+
+function closeSwipe(animate = true) {
+  if (openSwipe) setSwipe(openSwipe, 0, animate);
+  openSwipe = null;
+}
+
+document.addEventListener('pointerdown', (e) => {
+  const onDelete = e.target.closest('.swipe-del');
+  // Если кнопка уже открыта, тап в другом месте только закрывает её
+  pendingClose = Boolean(openSwipe && !onDelete);
+  suppressClick = pendingClose;
+  const wrap = e.target.closest('.swipe');
+  if (!wrap || onDelete || busy) return;
+  drag = {
+    wrap, id: e.pointerId, x0: e.clientX, y0: e.clientY, x: 0,
+    base: wrap === openSwipe ? -SWIPE_OPEN : 0, active: false,
+  };
+});
+
+document.addEventListener('pointermove', (e) => {
+  if (!drag || e.pointerId !== drag.id) return;
+  const dx = e.clientX - drag.x0;
+  const dy = e.clientY - drag.y0;
+  if (!drag.active) {
+    // Ждём, пока станет понятно направление: вбок — свайп, вверх-вниз — прокрутка
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+    if (Math.abs(dy) >= Math.abs(dx)) {
+      drag = null;
+      return;
+    }
+    drag.active = true;
+    pendingClose = false;
+    if (openSwipe && openSwipe !== drag.wrap) closeSwipe();
+    try { drag.wrap.setPointerCapture(e.pointerId); } catch { /* не страшно */ }
+  }
+  let x = Math.min(0, drag.base + dx);
+  // За пределом кнопки строка тянется туже, как резинка
+  if (x < -SWIPE_OPEN) x = -SWIPE_OPEN + (x + SWIPE_OPEN) / 3;
+  drag.x = x;
+  setSwipe(drag.wrap, x, false);
+});
+
+function endDrag() {
+  if (drag && drag.active) {
+    suppressClick = true;
+    const open = drag.x < -SWIPE_OPEN / 2;
+    setSwipe(drag.wrap, open ? -SWIPE_OPEN : 0, true);
+    if (open && openSwipe !== drag.wrap) haptic();
+    openSwipe = open ? drag.wrap : null;
+  } else if (pendingClose) {
+    closeSwipe();
+  }
+  pendingClose = false;
+  drag = null;
+}
+
+document.addEventListener('pointerup', endDrag);
+document.addEventListener('pointercancel', endDrag);
+
+// Плавно схлопывает строку списка
+function collapse(el) {
+  el.style.height = el.offsetHeight + 'px';
+  void el.offsetHeight; // фиксируем высоту, чтобы анимация пошла от неё
+  el.classList.add('removing');
+  return wait(380);
+}
 
 // ---------- Отрисовка ----------
 
@@ -295,6 +423,7 @@ function refreshScreen(el, index) {
   const y = el.scrollTop;
   el.innerHTML = screenHtml(index);
   el.scrollTop = y;
+  openSwipe = null;
 }
 
 // Обновляет текущий (верхний) экран после изменений
@@ -314,15 +443,19 @@ const sheet = document.getElementById('sheet');
 const sheetInput = document.getElementById('sheet-input');
 let sheetResolve = null;
 let sheetMultiline = false;
+let sheetTimer;
 
 // Показывает окно ввода. Возвращает введённый текст или null при отмене
 function ask({ title, value = '', placeholder = '', max = 50, multiline = false }) {
+  clearTimeout(sheetTimer);
+  closeSwipe();
   document.getElementById('sheet-title').textContent = title;
   sheetInput.value = value;
   sheetInput.placeholder = placeholder;
   sheetInput.maxLength = max;
   sheetInput.rows = multiline ? 6 : 1;
   sheetMultiline = multiline;
+  sheet.classList.remove('closing');
   sheet.classList.add('open');
   sheetInput.focus();
   return new Promise((resolve) => {
@@ -332,8 +465,9 @@ function ask({ title, value = '', placeholder = '', max = 50, multiline = false 
 }
 
 function closeSheet(result) {
-  sheet.classList.remove('open');
+  sheet.classList.add('closing'); // окно плавно уменьшается и исчезает
   sheetInput.blur();
+  sheetTimer = setTimeout(() => sheet.classList.remove('open', 'closing'), 260);
   const resolve = sheetResolve;
   sheetResolve = null;
   updateBackButton();
@@ -376,6 +510,10 @@ function esc(text) {
   ));
 }
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 let toastTimer;
 function toast(text) {
   const el = document.getElementById('toast');
@@ -385,7 +523,7 @@ function toast(text) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
 }
 
-// Лёгкая вибрация при сохранении (только в Telegram)
+// Лёгкая вибрация (только в Telegram)
 function haptic() {
   if (inTelegram && tg.isVersionAtLeast('6.1')) tg.HapticFeedback.impactOccurred('light');
 }
@@ -396,7 +534,7 @@ function applyTheme() {
     : window.matchMedia('(prefers-color-scheme: dark)').matches;
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   if (inTelegram) {
-    const bg = dark ? '#0f0f0f' : '#ffffff';
+    const bg = dark ? '#000000' : '#f2f2f7';
     try {
       tg.setBackgroundColor(bg);
       tg.setHeaderColor(bg);

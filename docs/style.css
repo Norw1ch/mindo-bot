@@ -1,21 +1,38 @@
-/* Монохромные цвета: светлая и тёмная тема */
+/* Цвета в стиле iOS: светлая и тёмная тема. Всё серое, кроме красного удаления */
 :root {
-  --bg: #ffffff;
-  --fg: #111111;
-  --muted: #8c8c8c;
-  --line: #e8e8e8;
-  --soft: #f4f4f4;
-  --inv-bg: #111111;
+  --page: #f2f2f7;          /* фон экрана */
+  --cell: #ffffff;          /* фон блоков и кнопок */
+  --cell-press: #e5e5ea;    /* блок при нажатии */
+  --fg: #000000;
+  --muted: rgba(60, 60, 67, 0.6);
+  --faint: rgba(60, 60, 67, 0.3);
+  --sep: rgba(60, 60, 67, 0.18);
+  --inv-bg: #1c1c1e;        /* главная кнопка */
   --inv-fg: #ffffff;
+  --red: #ff3b30;
+  --sheet: rgba(255, 255, 255, 0.94);
+  --field: rgba(118, 118, 128, 0.12);
+  --shade: rgba(0, 0, 0, 0.12);
+  --backdrop: rgba(0, 0, 0, 0.25);
+
+  --ease: cubic-bezier(.32, .72, 0, 1);
+  --soft: cubic-bezier(.2, .9, .3, 1);
 }
 [data-theme="dark"] {
-  --bg: #0f0f0f;
-  --fg: #f0f0f0;
-  --muted: #7c7c7c;
-  --line: #242424;
-  --soft: #1a1a1a;
-  --inv-bg: #f0f0f0;
-  --inv-fg: #0f0f0f;
+  --page: #000000;
+  --cell: #1c1c1e;
+  --cell-press: #2c2c2e;
+  --fg: #ffffff;
+  --muted: rgba(235, 235, 245, 0.6);
+  --faint: rgba(235, 235, 245, 0.3);
+  --sep: rgba(84, 84, 88, 0.6);
+  --inv-bg: #f2f2f7;
+  --inv-fg: #000000;
+  --red: #ff453a;
+  --sheet: rgba(44, 44, 46, 0.94);
+  --field: rgba(118, 118, 128, 0.24);
+  --shade: rgba(0, 0, 0, 0.5);
+  --backdrop: rgba(0, 0, 0, 0.5);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -23,105 +40,138 @@
 html, body { height: 100%; }
 body {
   overflow: hidden; /* прокручиваются сами экраны, а не страница */
-  background: var(--bg);
+  background: var(--page);
   color: var(--fg);
-  font: 16px/1.4 -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+  font: 17px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
 
-/* Экраны — слои друг над другом, каждый со своей прокруткой */
+/* ---------- Экраны-слои ---------- */
 #app { position: fixed; inset: 0; overflow: hidden; }
 .screen {
   position: absolute; inset: 0;
   overflow-y: auto; overscroll-behavior: contain;
-  background: var(--bg);
+  background: var(--page);
 }
 .screen ~ .screen { box-shadow: -12px 0 32px rgba(0, 0, 0, 0.14); } /* тень от верхнего слоя */
 .screen.covered { visibility: hidden; }
-.screen-inner { max-width: 560px; margin: 0 auto; padding: 20px 16px 40px; }
+.screen-inner { max-width: 560px; margin: 0 auto; padding: 16px 16px 48px; }
 
 /* Затемнение нижнего экрана во время перехода */
-.shade { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.16); pointer-events: none; }
-[data-theme="dark"] .shade { background: rgba(0, 0, 0, 0.5); }
+.shade { position: absolute; inset: 0; background: var(--shade); pointer-events: none; }
 
-/* Заголовок экрана */
-h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; word-break: break-word; }
-.sub { margin-top: 4px; color: var(--muted); font-size: 14px; }
-.back { margin-bottom: 14px; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 15px; cursor: pointer; }
-
-/* Списки */
-.list { margin-top: 20px; border-top: 1px solid var(--line); }
-.row {
-  display: flex; align-items: center; gap: 12px;
-  width: 100%; padding: 14px 2px;
-  border: 0; border-bottom: 1px solid var(--line);
-  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
-}
-.row:active { opacity: 0.5; }
-.row .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row .meta { color: var(--muted); font-size: 14px; }
+/* ---------- Заголовок ---------- */
+h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01em; word-break: break-word; }
+h1.swap { animation: title-swap .5s var(--soft) both; }
+.sub { margin-top: 4px; color: var(--muted); font-size: 15px; }
+.back { margin-bottom: 12px; color: var(--muted); font-size: 16px; }
 .empty { padding: 32px 0; color: var(--muted); text-align: center; }
 
-/* Кнопки */
-.actions { margin-top: 24px; }
-.btn {
-  display: block; width: 100%; margin-top: 10px; padding: 13px;
-  border: 1px solid var(--fg); border-radius: 10px;
-  background: none; color: var(--fg); font: inherit; cursor: pointer;
+/* ---------- Списки (скруглённые блоки) ---------- */
+.group { margin-top: 22px; border-radius: 12px; overflow: hidden; background: var(--cell); }
+.row {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; min-height: 50px; padding: 12px 16px;
+  background: var(--cell); text-align: left;
+  transition: background-color .3s ease;
 }
-.btn { transition: transform .18s ease, opacity .18s ease; }
-.btn:active { opacity: 0.7; transform: scale(0.98); }
-.btn.primary { background: var(--inv-bg); border-color: var(--inv-bg); color: var(--inv-fg); }
-.btn.quiet { border-color: var(--line); color: var(--muted); }
+.row:active { background: var(--cell-press); transition: none; }
+.row .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .meta { color: var(--muted); }
+.row .chev { flex: none; color: var(--faint); }
+.row.danger { color: var(--red); }
 
-/* Мелкие действия внизу экрана */
-.tools { display: flex; justify-content: center; gap: 28px; margin-top: 32px; }
-.link { padding: 6px 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; }
-.link:active { opacity: 0.5; }
+/* Тонкие разделители с отступом слева, как в iOS */
+.group > .row + .row::before,
+.swipe + .swipe .row::before {
+  content: ''; position: absolute; top: 0; left: 16px; right: 0;
+  height: 0.5px; background: var(--sep);
+}
 
-/* Окно ввода */
+/* ---------- Свайп для удаления ---------- */
+.swipe { position: relative; overflow: hidden; background: var(--cell); }
+.swipe .row { touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.swipe-del {
+  position: absolute; top: 6px; bottom: 6px; right: 8px; width: 80px;
+  border-radius: 10px; background: var(--red); color: #fff;
+  font-size: 15px; font-weight: 600;
+  opacity: 0; transform: scale(0.6);
+}
+.swipe-del:active { filter: brightness(0.9); }
+.settling { transition: transform .45s var(--ease), opacity .35s ease; }
+
+/* Строка плавно схлопывается после удаления */
+.swipe.removing { height: 0 !important; opacity: 0; transition: height .38s var(--ease), opacity .25s ease; }
+/* Новая строка плавно раздвигает место под себя */
+.swipe.appear { animation: row-appear .55s var(--soft) both; }
+
+/* ---------- Кнопки ---------- */
+.actions { display: grid; gap: 10px; margin-top: 22px; }
+.btn {
+  height: 50px; padding: 0 16px; border-radius: 14px;
+  background: var(--cell); font-weight: 600;
+  transition: transform .25s var(--soft), opacity .25s ease;
+}
+.btn:active { transform: scale(0.97); opacity: 0.8; transition-duration: .1s; }
+.btn.primary { background: var(--inv-bg); color: var(--inv-fg); }
+.btn.quiet { color: var(--muted); font-weight: 500; }
+
+/* ---------- Окно ввода (как системное окно iOS) ---------- */
 .sheet {
   position: fixed; inset: 0; z-index: 10;
   display: flex; align-items: flex-start; justify-content: center;
-  padding: 12vh 16px 0; background: rgba(0, 0, 0, 0.45);
+  padding: 14vh 20px 0;
+  background: var(--backdrop);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
   opacity: 0; visibility: hidden;
-  transition: opacity .32s ease, visibility 0s linear .32s;
+  transition: opacity .3s ease, visibility 0s linear .3s;
 }
-.sheet.open { opacity: 1; visibility: visible; transition: opacity .32s ease; }
+.sheet.open { opacity: 1; visibility: visible; transition: opacity .3s ease; }
+.sheet.open.closing { opacity: 0; transition: opacity .25s ease; }
 .sheet-box {
-  width: 100%; max-width: 528px; padding: 18px 16px 16px; border-radius: 14px; background: var(--bg);
-  transform: translateY(-18px) scale(0.98);
-  transition: transform .42s var(--ease);
+  width: 100%; max-width: 400px; padding: 20px 16px 16px; border-radius: 18px;
+  background: var(--sheet);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
 }
-.sheet.open .sheet-box { transform: none; }
-.sheet-title { margin-bottom: 12px; font-weight: 600; }
+.sheet.open .sheet-box { animation: alert-in .45s var(--soft) both; }
+.sheet.closing .sheet-box { animation: alert-out .25s ease-in both; }
+.sheet-title { margin-bottom: 14px; font-weight: 600; text-align: center; }
 .sheet textarea {
-  display: block; width: 100%; padding: 12px; resize: none;
-  border: 1px solid var(--line); border-radius: 10px; outline: none;
-  background: var(--soft); color: var(--fg); font: inherit;
+  display: block; width: 100%; padding: 12px 14px; resize: none;
+  border: 0; border-radius: 12px; outline: none;
+  background: var(--field); color: var(--fg); font: inherit;
 }
-.sheet textarea:focus { border-color: var(--muted); }
-.sheet-actions { display: flex; gap: 10px; margin-top: 12px; }
-.sheet-actions .btn { margin-top: 0; }
+.sheet textarea::placeholder { color: var(--faint); }
+.sheet-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.sheet-actions .btn { height: 46px; background: var(--field); }
+.sheet-actions .btn.primary { background: var(--inv-bg); }
 
-/* Всплывающая подсказка */
+/* ---------- Всплывающая подсказка ---------- */
 .toast {
-  position: fixed; z-index: 20; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
-  padding: 10px 16px; border-radius: 10px;
-  background: var(--inv-bg); color: var(--inv-fg); font-size: 14px;
-  opacity: 0; pointer-events: none; transition: opacity .3s, transform .3s;
+  position: fixed; z-index: 20; left: 50%; bottom: 28px; transform: translate(-50%, 16px) scale(0.96);
+  padding: 11px 18px; border-radius: 14px;
+  background: var(--inv-bg); color: var(--inv-fg); font-size: 15px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  opacity: 0; pointer-events: none;
+  transition: opacity .3s ease, transform .4s var(--soft);
 }
-.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
 
 /* ---------- Анимации ---------- */
-:root { --ease: cubic-bezier(.2, .8, .2, 1); }
-
-@keyframes in-fade { from { opacity: 0; } }
-@keyframes row-in  { from { opacity: 0; transform: translateY(8px); } }
+@keyframes in-fade     { from { opacity: 0; } }
+@keyframes row-in      { from { opacity: 0; transform: translateY(8px); } }
+@keyframes alert-in    { from { opacity: 0; transform: scale(1.1); } }
+@keyframes alert-out   { to   { opacity: 0; transform: scale(0.95); } }
+@keyframes title-swap  { from { opacity: 0; filter: blur(4px); transform: translateY(4px); } }
+@keyframes row-appear  { from { opacity: 0; max-height: 0; transform: scale(0.98); } to { max-height: 80px; } }
 
 /* Запуск приложения: экран проявляется, строки появляются по очереди (--i — номер строки).
    Переходы между экранами делает app.js */
 .screen.intro { animation: in-fade .5s ease; }
-.screen.intro .row {
+.screen.intro .swipe {
   animation: row-in .5s var(--ease) both;
   animation-delay: calc(var(--i, 0) * 45ms + 80ms);
 }
