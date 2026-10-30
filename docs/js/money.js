@@ -93,6 +93,7 @@ function confirmDeleteExpense(id) {
 }
 
 function deleteExpenseData(id) {
+  flash = 'total'; // итог месяца сменится мягко
   expenses.items = expenses.items.filter((e) => e.id !== id);
   return expenses.save();
 }
@@ -188,7 +189,7 @@ function monthHtml(route) {
           <span class="cal-title">${monthRange(offset).title}</span>
           <button class="pager-btn" data-act="money-month" data-dir="1"${offset >= 0 ? ' disabled' : ''}>${CHEVRON}</button>
         </div>
-        <b class="total-sum">${formatMoney(sum(list))}</b>
+        <b class="total-sum${takeFlash('total') ? ' swap' : ''}">${formatMoney(sum(list))}</b>
         <span class="total-sub">${list.length ? plural(list.length, ['расход', 'расхода', 'расходов']) : 'Расходов нет'}</span>
       </div>
       ${catsBreakdownHtml(offset)}
@@ -336,7 +337,7 @@ Object.assign(actions, {
       return;
     }
     const expense = { id: newId(), a: parseAmount(res[0]), c: catId, t: Date.now(), n: res[1] };
-    flash = expense.id;
+    flash = new Set([expense.id, 'total']); // новая строка появляется, итог мягко меняется
     const route = currentRoute();
     route.month = 0; // новый расход — в текущем месяце
     route.page = 0;

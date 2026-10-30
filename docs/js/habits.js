@@ -124,6 +124,12 @@ function habitsSummary() {
   return `Сегодня: ${done} из ${planned.length}`;
 }
 
+// Подпись под названием: график и серия — «Пн, Ср, Пт · серия 3»
+function habitInfoText(h) {
+  const s = streak(h);
+  return [h.wd ? scheduleLabel(h.wd) : '', s ? `серия ${streakText(h, s)}` : ''].filter(Boolean).join(' · ');
+}
+
 // Название, 7 точек за неделю (сегодня — последняя; дни вне графика бледнее), график и серия
 function habitInfoHtml(h) {
   const today = dayNum();
@@ -132,11 +138,16 @@ function habitInfoHtml(h) {
     const cls = `${isDone(h, d) ? ' on' : ''}${d === today ? ' today' : ''}${isScheduled(h, d) ? '' : ' off'}`;
     return `<span class="dot${cls}"></span>`;
   }).join('');
-  const s = streak(h);
-  const info = [h.wd ? scheduleLabel(h.wd) : '', s ? `серия ${streakText(h, s)}` : ''].filter(Boolean).join(' · ');
   return `
     <span class="habit-name">${esc(h.name)}</span>
-    <span class="habit-meta"><span class="dots">${dots}</span>${info}</span>`;
+    <span class="habit-meta"><span class="dots">${dots}</span><span class="habit-info">${habitInfoText(h)}</span></span>`;
+}
+
+// Обновить строку привычки на месте: точки плавно заливаются, подпись мягко меняется
+function updateHabitRow(row, h) {
+  const today = dayNum();
+  row.querySelectorAll('.dot').forEach((dot, i) => dot.classList.toggle('on', isDone(h, today - 6 + i)));
+  setText(row.querySelector('.habit-info'), habitInfoText(h));
 }
 
 function habitRowHtml(h, n) {
@@ -156,9 +167,15 @@ function habitRowHtml(h, n) {
 
 function statsHtml(h) {
   return `
-    <div class="stat"><b>${streak(h)}</b><span>Серия</span></div>
-    <div class="stat"><b>${bestStreak(h)}</b><span>Лучшая</span></div>
-    <div class="stat"><b>${totalDone(h)}</b><span>Всего</span></div>`;
+    <div class="stat"><b data-stat="streak">${streak(h)}</b><span>Серия</span></div>
+    <div class="stat"><b data-stat="best">${bestStreak(h)}</b><span>Лучшая</span></div>
+    <div class="stat"><b data-stat="total">${totalDone(h)}</b><span>Всего</span></div>`;
+}
+
+// Цифры статистики меняются мягко, только те, что изменились
+function updateStats(inner, h) {
+  const values = { streak: streak(h), best: bestStreak(h), total: totalDone(h) };
+  inner.querySelectorAll('[data-stat]').forEach((b) => setText(b, values[b.dataset.stat]));
 }
 
 // Календарь месяца: route.month — сдвиг от текущего месяца (0 — этот, -1 — прошлый)
@@ -295,8 +312,8 @@ Object.assign(actions, {
     const done = isDone(h, dayNum());
     el.classList.add('just');
     el.classList.toggle('checked', done);
-    el.closest('.row').querySelector('.habit-open').innerHTML = habitInfoHtml(h);
-    el.closest('.screen-inner').querySelector('.habits-sub').textContent = habitsSummary();
+    updateHabitRow(el.closest('.row'), h);
+    setText(el.closest('.screen-inner').querySelector('.habits-sub'), habitsSummary());
     const ok = await commit(() => habits.save(), () => {});
     if (!ok) refresh();
     else cheer(h);
@@ -308,7 +325,7 @@ Object.assign(actions, {
     toggleDay(h, Number(day));
     el.classList.add('just');
     el.classList.toggle('done', isDone(h, Number(day)));
-    el.closest('.screen-inner').querySelector('.stats').innerHTML = statsHtml(h);
+    updateStats(el.closest('.screen-inner'), h);
     const ok = await commit(() => habits.save(), () => {});
     if (!ok) refresh();
     else if (Number(day) === dayNum()) cheer(h);

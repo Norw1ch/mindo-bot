@@ -275,6 +275,46 @@ function swapContent(box, html, cls) {
   anim.finished.then(done, done);
 }
 
+// Мягко меняет текст: старый исчезает, новый проявляется с лёгким размытием (класс .swap)
+function setText(el, text) {
+  if (!el || el.textContent === String(text)) return;
+  el.textContent = text;
+  el.classList.remove('swap');
+  void el.offsetWidth; // перезапуск анимации
+  el.classList.add('swap');
+}
+
+// Плавно показывает или прячет блок: растёт или сворачивается по высоте и проявляется или гаснет,
+// поэтому то, что ниже, съезжает мягко, а не скачком. delay — пауза перед началом
+function revealBlock(el, show, delay = 0) {
+  clearTimeout(el.revealTimer);
+  el.revealTimer = setTimeout(() => {
+    const visible = !el.classList.contains('hidden');
+    if (visible === show) return;
+    if (el.revealAnim) el.revealAnim.cancel();
+    if (reduceMotion || !el.animate) {
+      el.classList.toggle('hidden', !show);
+      return;
+    }
+    if (show) el.classList.remove('hidden');
+    const height = `${el.offsetHeight}px`;
+    const margin = window.getComputedStyle ? window.getComputedStyle(el).marginTop : '0px';
+    const open = { height, marginTop: margin, opacity: 1, transform: 'none' };
+    const closed = { height: '0px', marginTop: '0px', opacity: 0, transform: 'scale(0.96)' };
+    el.style.overflow = 'hidden';
+    const anim = el.animate(show ? [closed, open] : [open, closed], {
+      duration: show ? 480 : 340,
+      easing: show ? 'cubic-bezier(.2, .9, .3, 1)' : 'cubic-bezier(.4, 0, .2, 1)',
+    });
+    el.revealAnim = anim;
+    anim.onfinish = () => {
+      el.revealAnim = null;
+      el.style.overflow = '';
+      if (!show) el.classList.add('hidden');
+    };
+  }, delay);
+}
+
 // Плавно схлопывает строку списка
 function collapse(el) {
   el.style.height = el.offsetHeight + 'px';

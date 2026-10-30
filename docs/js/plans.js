@@ -625,10 +625,16 @@ Object.assign(actions, {
       refresh();
       return;
     }
-    inner.querySelector('.date').innerHTML = dateLine(idea);
-    // Кнопка «Вернуть в работу» видна только у выполненных
-    inner.querySelector('.restore').classList.toggle('hidden', key !== 'done');
-    if (key === 'done') toast('Перенесено в «Выполненные»');
+    setText(inner.querySelector('.date'), dateLine(idea));
+    // «Вернуть в работу» — только у выполненных. Раскрывается чуть позже, когда таблетка уже доехала
+    const restore = inner.querySelector('.restore');
+    if (key === 'done') {
+      revealBlock(restore, true, 220);
+      successHaptic();
+      toast('Перенесено в «Выполненные»');
+    } else {
+      revealBlock(restore, false);
+    }
   },
 
   // Вернуть выполненный план в работу (◐) и уйти назад — в «Выполненные» или в раздел
@@ -680,7 +686,7 @@ Object.assign(actions, {
     el.classList.toggle('checked', it.d);
     const box = el.closest('.checklist');
     const { done, total } = itemsProgress(idea);
-    box.querySelector('.ch-label').textContent = `Чеклист · ${done} из ${total}`;
+    setText(box.querySelector('.ch-label'), `Чеклист · ${done} из ${total}`);
     box.querySelector('.bar span').style.width = `${(done / total) * 100}%`;
     const ok = await commit(() => saveIdea(idea), () => {});
     if (!ok) {

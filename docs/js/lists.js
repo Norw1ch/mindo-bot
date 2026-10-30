@@ -145,7 +145,7 @@ async function addQuickItem(input) {
   flash = item.id;
   const inner = input.closest('.screen-inner');
   inner.querySelector('.todo-group').insertAdjacentHTML('afterbegin', litemRowHtml(list, item, 0));
-  inner.querySelector('.list-sub').textContent = listSummary(list);
+  setText(inner.querySelector('.list-sub'), listSummary(list));
   const ok = await commit(() => lists.save(), () => {});
   if (!ok) refresh();
 }
@@ -205,7 +205,7 @@ Object.assign(actions, {
     el.classList.toggle('checked', it.d);
     // Отметил и сразу снял — строка остаётся на месте
     el.closest('.swipe').classList.toggle('moving');
-    el.closest('.screen-inner').querySelector('.list-sub').textContent = listSummary(list);
+    setText(el.closest('.screen-inner').querySelector('.list-sub'), listSummary(list));
     const ok = await commit(() => lists.save(), () => {});
     if (!ok) {
       refresh();

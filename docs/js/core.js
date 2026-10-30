@@ -322,6 +322,11 @@ function haptic() {
   if (inTelegram && tg.isVersionAtLeast('6.1')) tg.HapticFeedback.impactOccurred('light');
 }
 
+// Вибрация «получилось» — например, план выполнен
+function successHaptic() {
+  if (inTelegram && tg.isVersionAtLeast('6.1')) tg.HapticFeedback.notificationOccurred('success');
+}
+
 // Самая мягкая вибрация — переключения, открытие кнопки свайпа
 function softHaptic() {
   if (inTelegram && tg.isVersionAtLeast('6.1')) tg.HapticFeedback.selectionChanged();
