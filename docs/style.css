@@ -83,6 +83,17 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .row .chev { flex: none; color: var(--faint); }
 .row.danger { color: var(--red); }
 .row .st { flex: none; width: 22px; text-align: center; font-size: 15px; }
+.row .meta.small { font-size: 15px; white-space: nowrap; }
+
+/* Заголовок группы, как в настройках iOS */
+.group-head {
+  margin: 26px 18px 8px; color: var(--muted);
+  font-size: 13px; text-transform: uppercase; letter-spacing: 0.02em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.group-head + .group { margin-top: 0; }
+
+.hidden { display: none !important; }
 
 .empty.small { padding: 26px 0 8px; font-size: 15px; }
 

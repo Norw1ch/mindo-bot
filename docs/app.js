@@ -310,6 +310,20 @@ function ideaListHtml(sectionId, filter) {
   return `<div class="group">${rows}</div>`;
 }
 
+// Строка выполненного плана в «Выполненных»: ⚫, заголовок, дата выполнения
+function doneRowHtml(idea, n) {
+  return `
+    <div class="swipe" style="--i:${n}">
+      <button class="swipe-del" data-act="swipe-delete" data-kind="idea" data-id="${idea.id}">Удалить</button>
+      <button class="row" data-act="open-idea" data-id="${idea.id}">
+        <span class="st">${STATUS.done.icon}</span>
+        <span class="title">${esc(idea.title)}</span>
+        <span class="meta small">${idea.dt ? formatShort(idea.dt) : ''}</span>
+        ${CHEVRON}
+      </button>
+    </div>`;
+}
+
 function dateLine(idea) {
   const done = idea.st === 'done' && idea.dt ? ` · выполнен ${formatDate(idea.dt)}` : '';
   return `Создан ${formatDate(idea.at)}${done}`;
@@ -374,6 +388,9 @@ views.idea = (route) => {
       ${text}
       <p class="date">${dateLine(idea)}</p>
     </div>
+    <div class="actions restore${idea.st === 'done' ? '' : ' hidden'}">
+      <button class="btn primary" data-act="restore-idea" data-id="${idea.id}">↺ Вернуть в работу</button>
+    </div>
     <div class="group">
       <button class="row" data-act="edit-idea" data-id="${idea.id}">Изменить</button>
       <button class="row danger" data-act="delete-idea" data-id="${idea.id}">Удалить план</button>
@@ -385,6 +402,24 @@ views.idea = (route) => {
 const SECTION_MAX = 50;
 const TITLE_MAX = 80;
 const IDEA_MAX = 3000; // в облаке Telegram на одну запись — до 4096 символов
+
+// «Выполненные»: все Done, сгруппированные по разделам (в порядке разделов), свежие сверху
+views.archive = () => {
+  let total = 0;
+  const blocks = data.sections.map((s) => {
+    const ideas = filteredIdeas(s.id, 'done');
+    if (!ideas.length) return '';
+    total += ideas.length;
+    return `
+      <p class="group-head">${esc(s.name)} · ${ideas.length}</p>
+      <div class="group">${ideas.map(doneRowHtml).join('')}</div>`;
+  }).join('');
+
+  return `
+    <h1>Выполненные</h1>
+    <p class="sub">${total ? plural(total, ['план', 'плана', 'планов']) : 'Пока ничего не выполнено'}</p>
+    ${blocks || '<p class="empty">Здесь появятся планы со статусом ⚫ Done</p>'}`;
+};
 
 // Поля окна для идеи: заголовок и необязательное описание
 function ideaFields(idea = { title: '', text: '' }) {
@@ -489,7 +524,20 @@ const actions = {
       return;
     }
     inner.querySelector('.date').innerHTML = dateLine(idea);
+    // Кнопка «Вернуть в работу» видна только у выполненных
+    inner.querySelector('.restore').classList.toggle('hidden', key !== 'done');
     if (key === 'done') toast('Перенесено в «Выполненные»');
+  },
+
+  // Вернуть выполненный план в работу (◐) и уйти назад — в «Выполненные» или в раздел
+  'restore-idea': async ({ id }) => {
+    const idea = findIdea(id);
+    const ok = await commit(() => {
+      idea.st = 'wip';
+      idea.dt = null;
+      return saveIdea(idea);
+    }, back);
+    if (ok) toast('Возвращено в работу');
   },
 
   'edit-idea': async ({ id }) => {
@@ -511,8 +559,7 @@ const actions = {
     await commit(() => deleteIdeaData(id), back); // потом возвращаемся в раздел
   },
 
-  // Заглушка: появится на следующем этапе
-  'open-archive': () => toast('Будет на следующем этапе'),
+  'open-archive': () => go({ name: 'archive' }),
 };
 
 document.addEventListener('click', (e) => {
@@ -772,6 +819,11 @@ function formatDate(ms) {
   const opts = { day: 'numeric', month: 'long' };
   if (date.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
   return date.toLocaleDateString('ru-RU', opts);
+}
+
+// Короткая дата для списков: «30 окт.»
+function formatShort(ms) {
+  return new Date(ms).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 }
 
 function wait(ms) {
