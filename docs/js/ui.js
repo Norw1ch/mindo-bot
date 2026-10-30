@@ -82,6 +82,7 @@ function buildTabbar() {
 // Переключает вкладку. Повторное нажатие на текущую — возврат к её главному экрану
 function switchTab(key) {
   if (busy) return;
+  flushAllEdits();
   if (key === currentTab) {
     popToRoot();
     return;
@@ -105,6 +106,7 @@ function switchTab(key) {
     const screen = makeScreen(0);
     screens.push(screen);
     app.append(screen);
+    sizeEdits(screen);
   } else {
     refresh(); // данные могли измениться на другой вкладке
   }
@@ -135,6 +137,7 @@ function makeShade() {
 async function go(route) {
   if (busy) return;
   busy = true;
+  flushAllEdits();
   closeSwipe(false);
   stack.push(route);
   const under = screens[screens.length - 1];
@@ -142,6 +145,7 @@ async function go(route) {
   const shade = makeShade();
   screens.push(top);
   app.append(shade, top);
+  sizeEdits(top);
   updateBackButton();
 
   const anims = await finishAll([
@@ -166,6 +170,7 @@ async function back() {
   }
   if (busy || stack.length < 2) return;
   busy = true;
+  flushAllEdits(); // недописанный текст сохраняем до ухода с экрана
   stack.pop();
   const top = screens.pop();
   const under = screens[screens.length - 1];
@@ -217,6 +222,7 @@ function makeScreen(index) {
 function refreshScreen(el, index) {
   const y = el.scrollTop;
   el.innerHTML = screenHtml(index);
+  sizeEdits(el);
   el.scrollTop = y;
   openSwipe = null;
 }
@@ -336,6 +342,82 @@ function groupedPage(list, route, groupOf, rowOf) {
   });
   flush();
   return `<div class="page-items">${html}</div>${pagerHtml(p)}`;
+}
+
+// ---------- Правка прямо на экране ----------
+// Поле <textarea class="inline-edit" data-edit="тип" data-id="…">: нажал — печатаешь, сохраняется само
+// через паузу в наборе и при уходе с поля. Модуль задаёт editors[тип]:
+//   get(id) — текущее значение, save(id, value) — записать (сначала меняет данные, потом сохраняет),
+//   required — пустым быть нельзя (вернём прежнее)
+
+const editors = {};
+const editTimers = new Map(); // поле → таймер отложенного сохранения
+const EDIT_DELAY = 700;
+
+function editValue(el) {
+  // В однострочных полях переносы превращаем в пробелы
+  return el.dataset.multiline ? el.value.trim() : el.value.replace(/\s+/g, ' ').trim();
+}
+
+// final — поле покинули: пустой обязательный текст откатываем к прежнему
+async function flushEdit(el, final) {
+  clearTimeout(editTimers.get(el));
+  editTimers.delete(el);
+  const editor = editors[el.dataset.edit];
+  const { id } = el.dataset;
+  const value = editValue(el);
+  if (value === editor.get(id)) return;
+  if (!value && editor.required) {
+    if (final) {
+      el.value = editor.get(id);
+      autoGrow(el);
+      toast('Заголовок не может быть пустым');
+    }
+    return;
+  }
+  try {
+    await editor.save(id, value);
+  } catch (err) {
+    console.error(err);
+    toast(err.userMessage || 'Не удалось сохранить');
+    await loadData().catch(() => {});
+    refresh();
+  }
+}
+
+// Сохранить всё недописанное — перед переходами
+function flushAllEdits() {
+  [...editTimers.keys()].forEach((el) => flushEdit(el, true));
+}
+
+// Подогнать высоту полей под текст (после того, как экран попал на страницу)
+function sizeEdits(screen) {
+  screen.querySelectorAll('.inline-edit').forEach(autoGrow);
+}
+
+document.addEventListener('input', (e) => {
+  const el = e.target;
+  if (!el.classList.contains('inline-edit')) return;
+  autoGrow(el);
+  clearTimeout(editTimers.get(el));
+  editTimers.set(el, setTimeout(() => flushEdit(el, false), EDIT_DELAY));
+});
+document.addEventListener('focusout', (e) => {
+  if (e.target.classList.contains('inline-edit')) flushEdit(e.target, true);
+});
+// Enter в однострочном поле (заголовке) убирает клавиатуру
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.classList.contains('inline-edit') && !e.target.dataset.multiline) {
+    e.preventDefault();
+    e.target.blur();
+  }
+});
+
+// HTML поля правки. multiline — многострочное (описание), иначе однострочное (заголовок)
+function editHtml(type, id, value, { placeholder = '', max = 80, multiline = false, cls = '' } = {}) {
+  return `<textarea class="inline-edit ${cls}" data-edit="${type}" data-id="${id}" rows="1"
+    maxlength="${max}" placeholder="${placeholder}"${multiline ? ' data-multiline="1"' : ''}
+    enterkeyhint="${multiline ? 'enter' : 'done'}">${esc(value || '')}</textarea>`;
 }
 
 // ---------- Строка поиска ----------

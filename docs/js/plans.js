@@ -461,17 +461,16 @@ views.idea = (route) => {
   const idea = findIdea(route.id);
   if (!idea) return '<p class="empty">План не найден</p>';
   const section = findSection(idea.sec);
-  const swap = takeFlash(idea.id) ? ' swap' : '';
-  const text = idea.text
-    ? `<p class="idea-text">${esc(idea.text)}</p>`
-    : '<p class="idea-text none">Без описания</p>';
 
+  // Заголовок и описание правятся прямо здесь — нажал и пишешь
   return `
-    <h1 class="${swap}">${esc(idea.title)}</h1>
+    <h1>${editHtml('idea-title', idea.id, idea.title, { placeholder: 'Заголовок', max: TITLE_MAX })}</h1>
     <p class="sub">${section ? esc(section.name) : ''}</p>
     ${segHtml(STATUS_ITEMS, idea.st, 'set-status', ` data-id="${idea.id}"`, 'big')}
-    <div class="card${swap}">
-      ${text}
+    <div class="card">
+      ${editHtml('idea-text', idea.id, idea.text, {
+        placeholder: 'Добавить описание…', max: IDEA_MAX, multiline: true, cls: 'idea-text',
+      })}
       <p class="date">${dateLine(idea)}</p>
     </div>
     <div class="actions restore${idea.st === 'done' ? '' : ' hidden'}">
@@ -491,9 +490,27 @@ views.idea = (route) => {
       </button>
     </div>
     <div class="group">
-      <button class="row" data-act="edit-idea" data-id="${idea.id}">Изменить</button>
       <button class="row danger" data-act="delete-idea" data-id="${idea.id}">Удалить план</button>
     </div>`;
+};
+
+// Правка заголовка и описания плана на месте (см. editHtml в ui.js)
+editors['idea-title'] = {
+  required: true,
+  get: (id) => findIdea(id).title,
+  save: (id, value) => {
+    const idea = findIdea(id);
+    idea.title = value;
+    return saveIdea(idea);
+  },
+};
+editors['idea-text'] = {
+  get: (id) => findIdea(id).text || '',
+  save: (id, value) => {
+    const idea = findIdea(id);
+    idea.text = value;
+    return saveIdea(idea);
+  },
 };
 
 // «Выполненные»: все Done, сгруппированные по разделам (в порядке разделов), свежие сверху
@@ -622,20 +639,6 @@ Object.assign(actions, {
       return saveIdea(idea);
     }, back);
     if (ok) toast('Возвращено в работу');
-  },
-
-  'edit-idea': async ({ id }) => {
-    const idea = findIdea(id);
-    const res = await ask({ title: 'Изменить план', fields: ideaFields(idea) });
-    if (!res) return;
-    const [title, text] = res;
-    if (title === idea.title && text === idea.text) return;
-    flash = id;
-    await commit(() => {
-      idea.title = title;
-      idea.text = text;
-      return saveIdea(idea);
-    });
   },
 
   'delete-idea': async ({ id }) => {

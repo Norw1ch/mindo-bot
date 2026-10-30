@@ -106,21 +106,42 @@ views.notes = (route) => {
 views.note = (route) => {
   const note = notes.find(route.id);
   if (!note) return '<p class="empty">Заметка не найдена</p>';
-  const swap = takeFlash(note.id) ? ' swap' : '';
-  const text = note.text
-    ? `<p class="idea-text">${esc(note.text)}</p>`
-    : '<p class="idea-text none">Пусто</p>';
 
+  // Заголовок и текст правятся прямо здесь — нажал и пишешь
   return `
-    <h1 class="${swap}">${esc(note.title)}</h1>
+    <h1>${editHtml('note-title', note.id, note.title, { placeholder: 'Заголовок', max: NOTE_TITLE_MAX })}</h1>
     <p class="sub">${note.pin ? 'Закреплена · ' : ''}Изменена ${formatDate(note.up)}</p>
-    <div class="card${swap}">${text}</div>
+    <div class="card">
+      ${editHtml('note-text', note.id, note.text, {
+        placeholder: 'Текст заметки…', max: NOTE_TEXT_MAX, multiline: true, cls: 'idea-text',
+      })}
+    </div>
     <div class="group">
-      <button class="row" data-act="edit-note" data-id="${note.id}">Изменить</button>
       <button class="row" data-act="pin-note" data-id="${note.id}">${note.pin ? 'Открепить' : 'Закрепить'}</button>
       <button class="row" data-act="copy-note" data-id="${note.id}">Скопировать текст</button>
       <button class="row danger" data-act="delete-note" data-id="${note.id}">Удалить заметку</button>
     </div>`;
+};
+
+// Правка заголовка и текста заметки на месте (см. editHtml в ui.js)
+editors['note-title'] = {
+  required: true,
+  get: (id) => notes.find(id).title,
+  save: (id, value) => {
+    const note = notes.find(id);
+    note.title = value;
+    note.up = Date.now();
+    return notes.save();
+  },
+};
+editors['note-text'] = {
+  get: (id) => notes.find(id).text || '',
+  save: (id, value) => {
+    const note = notes.find(id);
+    note.text = value;
+    note.up = Date.now();
+    return notes.save();
+  },
 };
 
 // ---------- Действия ----------
@@ -148,21 +169,6 @@ Object.assign(actions, {
   },
 
   'open-note': ({ id }) => go({ name: 'note', id }),
-
-  'edit-note': async ({ id }) => {
-    const note = notes.find(id);
-    const res = await ask({ title: 'Изменить заметку', fields: noteFields(note) });
-    if (!res) return;
-    const [title, text] = res;
-    if (title === note.title && text === note.text) return;
-    flash = id;
-    await commit(() => {
-      note.title = title;
-      note.text = text;
-      note.up = Date.now();
-      return notes.save();
-    });
-  },
 
   'pin-note': async ({ id }) => {
     const note = notes.find(id);
