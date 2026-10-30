@@ -668,22 +668,64 @@ document.addEventListener('pointercancel', endDrag);
 // Показываем обратно с задержкой — когда клавиатура уже уехала
 
 const tabbarHiders = new Set();
-const TABBAR_BACK_DELAY = 400;
+const TABBAR_FALLBACK = 500; // если телефон не сообщил, что клавиатура уехала, — показываем через столько
 let tabbarTimer;
+let tabbarPending = false;
+
+// Видимая высота экрана; без клавиатуры она максимальная — запоминаем её
+function viewHeight() {
+  return window.visualViewport ? window.visualViewport.height : window.innerHeight;
+}
+let fullHeight = viewHeight();
+
+function keyboardGone() {
+  return viewHeight() >= fullHeight - 80;
+}
+
+function showTabbarNow() {
+  clearTimeout(tabbarTimer);
+  tabbarPending = false;
+  if (!tabbarHiders.size) document.body.classList.remove('no-tabbar');
+}
 
 function hideTabbar(reason) {
   clearTimeout(tabbarTimer);
+  tabbarPending = false;
   tabbarHiders.add(reason);
   document.body.classList.add('no-tabbar');
 }
 
+// Вернуть панель, как только клавиатура уехала (следим за высотой экрана), но не позже TABBAR_FALLBACK
 function releaseTabbar(reason) {
   tabbarHiders.delete(reason);
   clearTimeout(tabbarTimer);
-  tabbarTimer = setTimeout(() => {
-    if (!tabbarHiders.size) document.body.classList.remove('no-tabbar');
-  }, TABBAR_BACK_DELAY);
+  tabbarPending = true;
+  // Короткая пауза — вдруг фокус сразу перейдёт в соседнее поле
+  setTimeout(() => {
+    if (tabbarPending && !tabbarHiders.size && keyboardGone()) showTabbarNow();
+  }, 60);
+  tabbarTimer = setTimeout(showTabbarNow, TABBAR_FALLBACK);
 }
+
+let lastWidth = window.innerWidth;
+
+function onViewportResize() {
+  const h = viewHeight();
+  // Запоминаем только наибольшую высоту (без клавиатуры). Повернули телефон — запоминаем заново
+  if (window.innerWidth !== lastWidth) {
+    lastWidth = window.innerWidth;
+    fullHeight = h;
+  } else if (h > fullHeight) {
+    fullHeight = h;
+  }
+  if (tabbarPending && !tabbarHiders.size && keyboardGone()) showTabbarNow();
+  fitSheet();
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', onViewportResize);
+  window.visualViewport.addEventListener('scroll', fitSheet);
+}
+window.addEventListener('resize', onViewportResize);
 
 // Поле, при котором появляется клавиатура (а не выбор файла или даты)
 function opensKeyboard(el) {
@@ -729,10 +771,12 @@ function ask({ title, fields }) {
   });
   sheetFields.replaceChildren(...sheetInputs);
   hideTabbar('sheet');
-  // Отступ сверху фиксируем сейчас: когда выедет клавиатура, экран станет ниже, а окно не должно сдвигаться
-  sheet.style.paddingTop = `${Math.round(window.innerHeight * 0.12)}px`;
+  // «Родной» отступ сверху считаем сейчас, пока клавиатуры нет; дальше его двигает только fitSheet
+  sheetPad = Math.round(viewHeight() * 0.12);
+  sheet.style.paddingTop = `${sheetPad}px`;
   sheet.classList.remove('closing');
   sheet.classList.add('open');
+  fitSheet();
   sheetInputs.forEach((el) => { if (!el.dataset.multiline) autoGrow(el); });
   sheetInputs[0].focus();
   return new Promise((resolve) => {
@@ -744,6 +788,34 @@ function ask({ title, fields }) {
 function autoGrow(el) {
   el.style.height = 'auto';
   el.style.height = el.scrollHeight + 'px';
+}
+
+// Держим окно ввода в видимой части экрана. Окно стоит на своём месте, пока помещается;
+// если клавиатура закрывает его низ — поднимаем ровно настолько, насколько нужно,
+// а если места совсем мало — делаем ниже многострочное поле (внутри появится прокрутка)
+let sheetPad = 0;
+const SHEET_GAP = 12; // зазор до края видимой области
+
+function fitSheet() {
+  if (!sheet.classList.contains('open') || sheet.classList.contains('closing')) return;
+  const vv = window.visualViewport;
+  const visible = viewHeight();
+  // Окно занимает только видимую часть экрана (над клавиатурой)
+  sheet.style.top = `${vv ? vv.offsetTop : 0}px`;
+  sheet.style.height = `${visible}px`;
+
+  const box = sheet.querySelector('.sheet-box');
+  const multi = sheetInputs.find((el) => el.dataset.multiline);
+  if (multi) multi.style.maxHeight = '';
+  const boxHeight = box.offsetHeight;
+  let pad = sheetPad;
+  const overflow = pad + boxHeight - (visible - SHEET_GAP);
+  if (overflow > 0) {
+    pad = Math.max(SHEET_GAP, pad - overflow);
+    const still = pad + boxHeight - (visible - SHEET_GAP);
+    if (still > 0 && multi) multi.style.maxHeight = `${Math.max(64, multi.offsetHeight - still)}px`;
+  }
+  sheet.style.paddingTop = `${pad}px`;
 }
 
 // Enter в однострочном поле — к следующему полю или сохранить; Ctrl+Enter — сохранить всегда
@@ -762,7 +834,12 @@ function closeSheet(result) {
   sheet.classList.add('closing'); // окно плавно уменьшается и исчезает
   sheetInputs.forEach((el) => el.blur());
   releaseTabbar('sheet');
-  sheetTimer = setTimeout(() => sheet.classList.remove('open', 'closing'), 260);
+  sheetTimer = setTimeout(() => {
+    sheet.classList.remove('open', 'closing');
+    // Окно спрятано — возвращаем ему обычные размеры
+    sheet.style.top = '';
+    sheet.style.height = '';
+  }, 260);
   const resolve = sheetResolve;
   sheetResolve = null;
   updateBackButton();

@@ -67,8 +67,10 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
   -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
   box-shadow: 0 -0.5px 0 var(--sep);
 }
-/* Пока открыта клавиатура — панель тихо гаснет на месте, без движения */
-.tabbar { transition: opacity .25s ease; }
+/* Пока открыта клавиатура — панель тихо гаснет на месте, без движения,
+   а экран занимает её место (иначе над клавиатурой остаётся пустая полоса) */
+.tabbar { transition: opacity .2s ease; }
+body.no-tabbar #app { bottom: 0; }
 body.no-tabbar .tabbar {
   opacity: 0; visibility: hidden; pointer-events: none;
   transition: opacity .12s ease, visibility 0s linear .12s;
@@ -422,7 +424,8 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
   opacity: 0; visibility: hidden;
   transition: opacity .3s ease, visibility 0s linear .3s;
 }
-.sheet.open { opacity: 1; visibility: visible; transition: opacity .3s ease; }
+/* Отступ сверху меняется плавно — когда окно поднимается над клавиатурой */
+.sheet.open { opacity: 1; visibility: visible; transition: opacity .3s ease, padding-top .3s var(--soft); }
 .sheet.open.closing { opacity: 0; transition: opacity .25s ease; }
 .sheet-box {
   width: 100%; max-width: 400px; padding: 22px 18px 18px; border-radius: 28px;
