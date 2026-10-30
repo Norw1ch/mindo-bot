@@ -184,7 +184,7 @@ function shownMonth(route) {
   return new Date(now.getFullYear(), now.getMonth() + (route.month || 0), 1);
 }
 
-// Числа месяца (сетка Пн–Вс)
+// Числа месяца (сетка Пн–Вс). Всегда 6 недель (42 клетки) — высота календаря не меняется
 function calCellsHtml(h, route) {
   const shown = shownMonth(route);
   const y = shown.getFullYear();
@@ -199,6 +199,7 @@ function calCellsHtml(h, route) {
     const cls = `${isDone(h, num) ? ' done' : ''}${num === today ? ' today' : ''}${isScheduled(h, num) ? '' : ' off'}`;
     cells.push(`<button class="cal-day${cls}" data-act="toggle-habit-day" data-id="${h.id}" data-day="${num}"${num > today ? ' disabled' : ''}>${d}</button>`);
   }
+  while (cells.length < 42) cells.push('<span class="cal-pad"></span>');
   return cells.join('');
 }
 
@@ -214,44 +215,151 @@ function calendarHtml(h, route) {
     <div class="cal-viewport"><div class="cal-grid">${calCellsHtml(h, route)}</div></div>`;
 }
 
-// Перелистывание месяца: старая сетка целиком уезжает в сторону, новая въезжает с другой,
-// высота плавно подстраивается (в месяце бывает 5 или 6 недель). Без проявления и размытия
-const CAL_SLIDE = { duration: 420, easing: 'cubic-bezier(.32, .72, 0, 1)' };
+// ---------- Перелистывание месяцев: стрелками и свайпом ----------
+// Двигаются только сетки чисел (сдвиг — самая плавная анимация для телефона), высота не меняется.
+// Свайп: сетка едет за пальцем, соседний месяц выглядывает с края. Отпустил дальше четверти ширины
+// или смахнул быстро — перелистнулось, иначе мягко вернулось. В будущее не листается — только «резинка»
 
-function slideCalendar(cal, h, route, dir) {
-  if (cal.slideDone) cal.slideDone(); // прошлое перелистывание ещё идёт — завершаем сразу
-  cal.querySelector('.cal-title').textContent = monthTitle(shownMonth(route));
-  cal.querySelector('[data-dir="1"]').disabled = (route.month || 0) >= 0;
+const CAL_MS = 520;
+const CAL_EASE = 'cubic-bezier(.25, .8, .25, 1)';
+const CAL_COMPLETE = 0.25; // какую долю ширины протянуть, чтобы перелистнуть
+const CAL_FLICK = 0.4;     // скорость (пикселей в мс) короткого смахивания
 
+function canGo(route, dir) {
+  return dir < 0 || (route.month || 0) + dir <= 0;
+}
+
+// Начать перелистывание в сторону dir (1 — следующий месяц, -1 — прошлый): соседняя сетка встаёт рядом
+function calPeek(cal, dir) {
+  const route = currentRoute();
   const viewport = cal.querySelector('.cal-viewport');
-  const old = viewport.querySelector('.cal-grid');
-  const fresh = document.createElement('div');
-  fresh.className = 'cal-grid';
-  fresh.innerHTML = calCellsHtml(h, route);
-  if (reduceMotion || !viewport.animate) {
-    old.replaceWith(fresh);
-    return;
+  const p = { cal, dir, viewport, old: viewport.querySelector('.cal-grid'), fresh: null, width: viewport.offsetWidth || 320 };
+  if (canGo(route, dir)) {
+    p.fresh = document.createElement('div');
+    p.fresh.className = 'cal-grid sliding';
+    p.fresh.innerHTML = calCellsHtml(habits.find(route.id), { month: (route.month || 0) + dir });
+    p.fresh.style.transform = `translateX(${dir > 0 ? 100 : -100}%)`;
+    viewport.append(p.fresh);
+  }
+  cal.pager = p;
+  return p;
+}
+
+// Сдвинуть обе сетки на dx пикселей (во время свайпа)
+function calMove(p, dx) {
+  p.old.style.transform = `translateX(${dx}px)`;
+  if (p.fresh) p.fresh.style.transform = `translateX(calc(${p.dir > 0 ? 100 : -100}% + ${dx}px))`;
+}
+
+// Довести перелистывание до конца (complete) или вернуть на место; duration — сколько осталось ехать
+function calSettle(p, complete, duration = CAL_MS) {
+  const go = complete && p.fresh;
+  const opts = { duration, easing: CAL_EASE, fill: 'forwards' };
+  const anims = reduceMotion || !p.old.animate ? [] : [
+    p.old.animate([{ transform: p.old.style.transform || 'translateX(0)' },
+      { transform: go ? `translateX(${p.dir > 0 ? -100 : 100}%)` : 'translateX(0)' }], opts),
+    p.fresh && p.fresh.animate([{ transform: p.fresh.style.transform },
+      { transform: go ? 'translateX(0)' : `translateX(${p.dir > 0 ? 100 : -100}%)` }], opts),
+  ].filter(Boolean);
+
+  if (go) {
+    // Месяц сменился — заголовок и стрелку обновляем сразу, мягким проявлением (без размытия)
+    const route = currentRoute();
+    route.month = (route.month || 0) + p.dir;
+    const title = p.cal.querySelector('.cal-title');
+    title.textContent = monthTitle(shownMonth(route));
+    if (title.animate && !reduceMotion) title.animate([{ opacity: 0.2 }, { opacity: 1 }], { duration: 300, easing: 'ease-out' });
+    p.cal.querySelector('[data-dir="1"]').disabled = (route.month || 0) >= 0;
+    softHaptic();
   }
 
-  const from = viewport.offsetHeight;
-  fresh.classList.add('sliding'); // на время перелистывания новая сетка лежит поверх, рядом со старой
-  viewport.append(fresh);
-  const to = fresh.offsetHeight;
-  const away = dir > 0 ? '-100%' : '100%';
-  const enter = dir > 0 ? '100%' : '-100%';
-  const anims = [
-    old.animate([{ transform: 'translateX(0)' }, { transform: `translateX(${away})` }], { ...CAL_SLIDE, fill: 'forwards' }),
-    fresh.animate([{ transform: `translateX(${enter})` }, { transform: 'translateX(0)' }], CAL_SLIDE),
-    viewport.animate([{ height: `${from}px` }, { height: `${to}px` }], CAL_SLIDE),
-  ];
-  cal.slideDone = () => {
-    cal.slideDone = null;
-    old.remove();
-    fresh.classList.remove('sliding');
+  p.finish = () => {
+    if (p.cal.pager !== p) return;
+    p.cal.pager = null;
+    if (go) {
+      p.old.remove();
+      p.fresh.classList.remove('sliding');
+      p.fresh.style.transform = '';
+    } else {
+      if (p.fresh) p.fresh.remove();
+      p.old.style.transform = '';
+    }
     anims.forEach((a) => a.cancel());
   };
-  anims[1].onfinish = () => { if (cal.slideDone) cal.slideDone(); };
+  if (anims.length) anims[0].onfinish = p.finish;
+  else p.finish();
 }
+
+// Прошлое перелистывание ещё идёт — завершаем его сразу, чтобы не было каши
+function calFinishRunning(cal) {
+  if (cal.pager && cal.pager.finish) cal.pager.finish();
+  else if (cal.pager) cal.pager = null;
+}
+
+// Стрелки ‹ ›
+function slideCalendar(cal, dir) {
+  calFinishRunning(cal);
+  if (!canGo(currentRoute(), dir)) return;
+  calSettle(calPeek(cal, dir), true);
+}
+
+// Свайп по календарю
+let calDrag = null;
+
+document.addEventListener('touchstart', (e) => {
+  const viewport = e.target && e.target.closest ? e.target.closest('.cal-viewport') : null;
+  if (!viewport || e.touches.length !== 1 || busy) return;
+  const touch = e.touches[0];
+  if (touch.clientX <= EDGE_ZONE) return; // у самого края — это жест «назад»
+  calDrag = {
+    cal: viewport.closest('.cal'), x0: touch.clientX, y0: touch.clientY,
+    lastX: touch.clientX, lastT: e.timeStamp, v: 0, dx: 0, p: null,
+  };
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+  if (!calDrag) return;
+  const touch = e.touches[0];
+  const dx = touch.clientX - calDrag.x0;
+  const dy = touch.clientY - calDrag.y0;
+  if (!calDrag.p) {
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+    if (Math.abs(dy) > Math.abs(dx)) { // вверх-вниз — это прокрутка экрана
+      calDrag = null;
+      return;
+    }
+    calFinishRunning(calDrag.cal);
+  }
+  e.preventDefault();
+  // Тянем влево — следующий месяц, вправо — прошлый. Сменил направление — сосед меняется
+  const dir = dx < 0 ? 1 : -1;
+  if (!calDrag.p || calDrag.p.dir !== dir) {
+    if (calDrag.p && calDrag.p.fresh) calDrag.p.fresh.remove();
+    calDrag.p = calPeek(calDrag.cal, dir);
+  }
+  calDrag.v = (touch.clientX - calDrag.lastX) / Math.max(1, e.timeStamp - calDrag.lastT);
+  calDrag.lastX = touch.clientX;
+  calDrag.lastT = e.timeStamp;
+  // В будущее нельзя — сетка тянется туго, как резинка
+  calDrag.dx = calDrag.p.fresh ? dx : dx / 4;
+  calMove(calDrag.p, calDrag.dx);
+}, { passive: false });
+
+function endCalDrag() {
+  if (!calDrag) return;
+  const d = calDrag;
+  calDrag = null;
+  if (!d.p) return;
+  const share = Math.abs(d.dx) / d.p.width;
+  const flick = Math.abs(d.v) > CAL_FLICK && Math.sign(d.v) === Math.sign(d.dx);
+  const complete = Boolean(d.p.fresh) && (share > CAL_COMPLETE || flick);
+  // Доезжаем оставшееся расстояние: чем меньше осталось, тем быстрее
+  const rest = complete ? 1 - Math.min(1, share) : Math.min(1, share);
+  calSettle(d.p, complete, Math.max(220, CAL_MS * rest));
+}
+
+document.addEventListener('touchend', endCalDrag);
+document.addEventListener('touchcancel', endCalDrag);
 
 // ---------- Экраны ----------
 
@@ -376,13 +484,8 @@ Object.assign(actions, {
     else if (Number(day) === dayNum()) cheer(h);
   },
 
-  // Листание месяцев: старый уезжает в сторону, новый въезжает с другой
-  'habit-month': ({ dir }, el) => {
-    const route = currentRoute();
-    route.month = (route.month || 0) + Number(dir);
-    slideCalendar(el.closest('.cal'), habits.find(route.id), route, Number(dir));
-    softHaptic();
-  },
+  // Стрелки ‹ ›: старый месяц уезжает в сторону, новый въезжает с другой
+  'habit-month': ({ dir }, el) => slideCalendar(el.closest('.cal'), Number(dir)),
 
   // Поменять график: каждый день или выбранные дни недели
   'habit-days': async ({ id }) => {
