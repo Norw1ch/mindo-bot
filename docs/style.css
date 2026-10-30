@@ -191,11 +191,14 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .pager-btn.prev .chev { transform: rotate(180deg); }
 .pager-info { min-width: 56px; color: var(--muted); font-size: 15px; text-align: center; font-variant-numeric: tabular-nums; }
 
-/* Новая страница въезжает справа (вперёд) или слева (назад) */
-@keyframes page-next { from { opacity: 0; transform: translateX(32px); } }
-@keyframes page-prev { from { opacity: 0; transform: translateX(-32px); } }
-.paged.page-next .page-items { animation: page-next .45s var(--soft) both; }
-.paged.page-prev .page-items { animation: page-prev .45s var(--soft) both; }
+/* Новая страница въезжает справа (вперёд) или слева (назад), старая в это время уезжает и гаснет */
+@keyframes page-next { from { opacity: 0; transform: translateX(40px); } }
+@keyframes page-prev { from { opacity: 0; transform: translateX(-40px); } }
+.paged { position: relative; }
+.paged.page-next > .page-items { animation: page-next .5s var(--soft) both; animation-delay: 60ms; }
+.paged.page-prev > .page-items { animation: page-prev .5s var(--soft) both; animation-delay: 60ms; }
+/* «Призрак» старого содержимого — поверх нового, нажать на него нельзя */
+.swap-ghost { position: absolute; top: 0; left: 0; right: 0; pointer-events: none; }
 
 /* ---------- Поиск ---------- */
 .search { display: flex; align-items: center; margin-top: 14px; }

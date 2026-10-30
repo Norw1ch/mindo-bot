@@ -177,7 +177,7 @@ function ideaListHtml(route) {
   const filter = route.filter || 'all';
   const all = filteredIdeas(route.id, filter);
   if (!all.length) {
-    return `<p class="empty small">${filter === 'all' ? 'Планов пока нет' : 'Здесь пусто'}</p>`;
+    return `<div class="page-items"><p class="empty small">${filter === 'all' ? 'Планов пока нет' : 'Здесь пусто'}</p></div>`;
   }
   const p = paginate(all, route);
   const rows = p.items.map((idea, n) => `
@@ -595,15 +595,19 @@ Object.assign(actions, {
   'open-idea': ({ id }) => go({ name: 'idea', id }),
 
   // Фильтр в разделе: таблетка переезжает, список мягко обновляется
+  // Новый список въезжает с той стороны, куда переключили (вправо по фильтрам — справа)
   'set-filter': ({ key }, el) => {
     const route = currentRoute();
-    if ((route.filter || 'all') === key) return;
+    const old = route.filter || 'all';
+    if (old === key) return;
+    const order = FILTERS.map((f) => f.key);
     route.filter = key;
     route.page = 0;
     closeSwipe(false);
     moveSeg(el.closest('.seg'), key);
+    softHaptic();
     const box = el.closest('.screen-inner').querySelector('.paged');
-    swapContent(box, ideaListHtml(route), 'list-swap');
+    swapContent(box, ideaListHtml(route), order.indexOf(key) > order.indexOf(old) ? 'page-next' : 'page-prev');
   },
 
   // Статус в карточке: сохраняем сразу, экран не перерисовываем, чтобы таблетка плавно переехала

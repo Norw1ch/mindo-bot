@@ -204,6 +204,108 @@ async function popToRoot() {
   await back();
 }
 
+// ---------- «Назад» свайпом от левого края (как в iOS) ----------
+// Палец у левого края ведёт вправо — верхний экран едет за пальцем, предыдущий выглядывает из-под него
+// и светлеет. Отпустил дальше трети ширины или смахнул быстро — экран закрывается, иначе возвращается
+
+const EDGE_ZONE = 28;       // ширина полосы у левого края, откуда начинается жест
+const EDGE_COMPLETE = 0.33; // какую долю ширины протянуть, чтобы закрыть экран
+const EDGE_FLICK = 0.5;     // скорость (пикселей в мс), при которой хватит короткого смахивания
+let edge = null;
+
+function edgeAllowed() {
+  return stack.length > 1 && !busy && !sheetResolve && !choiceResolve;
+}
+
+document.addEventListener('touchstart', (e) => {
+  if (e.touches.length !== 1 || !edgeAllowed()) return;
+  const touch = e.touches[0];
+  if (touch.clientX > EDGE_ZONE) return;
+  edge = {
+    x0: touch.clientX, y0: touch.clientY, dx: 0, v: 0,
+    lastX: touch.clientX, lastT: e.timeStamp, active: false,
+  };
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+  if (!edge) return;
+  const touch = e.touches[0];
+  const dx = touch.clientX - edge.x0;
+  const dy = touch.clientY - edge.y0;
+  if (!edge.active) {
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+    // Не вправо, а вверх-вниз или влево — это не жест «назад»
+    if (dx <= 0 || Math.abs(dy) > Math.abs(dx)) {
+      edge = null;
+      return;
+    }
+    startEdgeDrag();
+  }
+  e.preventDefault(); // пока тянем — экран не прокручивается
+  edge.v = (touch.clientX - edge.lastX) / Math.max(1, e.timeStamp - edge.lastT);
+  edge.lastX = touch.clientX;
+  edge.lastT = e.timeStamp;
+  edge.dx = Math.max(0, dx);
+  setEdgeProgress();
+}, { passive: false });
+
+document.addEventListener('touchend', finishEdgeDrag);
+document.addEventListener('touchcancel', finishEdgeDrag);
+
+function startEdgeDrag() {
+  busy = true; // пока тянем — нажатия не обрабатываем
+  flushAllEdits();
+  closeSwipe(false);
+  edge.active = true;
+  edge.top = screens[screens.length - 1];
+  edge.under = screens[screens.length - 2];
+  edge.width = app.clientWidth || window.innerWidth;
+  refreshScreen(edge.under, stack.length - 2); // данные могли измениться, пока он был закрыт
+  edge.under.classList.remove('covered');
+  edge.shade = makeShade();
+  edge.top.before(edge.shade);
+}
+
+// Экран за пальцем: верхний сдвигается, нижний выезжает из-под него, затемнение уходит
+function setEdgeProgress() {
+  const p = Math.min(1, edge.dx / edge.width);
+  edge.top.style.transform = `translateX(${edge.dx}px)`;
+  edge.under.style.transform = `translateX(${-28 * (1 - p)}%)`;
+  edge.shade.style.opacity = String(1 - p);
+}
+
+async function finishEdgeDrag() {
+  if (!edge) return;
+  const g = edge;
+  edge = null;
+  if (!g.active) return;
+  const p = Math.min(1, g.dx / g.width);
+  const complete = p > EDGE_COMPLETE || g.v > EDGE_FLICK;
+  // Доезжаем оставшееся расстояние: чем меньше осталось, тем быстрее
+  const rest = complete ? 1 - p : p;
+  const opts = { duration: Math.max(180, 420 * rest), easing: 'cubic-bezier(.2, .9, .3, 1)', fill: 'forwards' };
+  const anims = reduceMotion || !g.top.animate ? [] : [
+    g.top.animate([{ transform: g.top.style.transform }, { transform: complete ? 'translateX(100%)' : 'translateX(0)' }], opts),
+    g.under.animate([{ transform: g.under.style.transform }, { transform: complete ? 'translateX(0)' : UNDER_SHIFT }], opts),
+    g.shade.animate([{ opacity: g.shade.style.opacity }, { opacity: complete ? 0 : 1 }], opts),
+  ];
+  await Promise.all(anims.map((a) => a.finished));
+  g.top.style.transform = '';
+  g.under.style.transform = '';
+  g.shade.remove();
+  if (complete) {
+    stack.pop();
+    screens.pop();
+    g.top.remove();
+    softHaptic();
+  } else {
+    g.under.classList.add('covered'); // передумал — нижний экран снова прячем
+  }
+  anims.forEach((a) => a.cancel());
+  updateBackButton();
+  busy = false;
+}
+
 // ---------- Отрисовка ----------
 
 function screenHtml(index) {
@@ -252,19 +354,38 @@ function restartAnim(el, cls) {
 const CLIP_Y = window.CSS && CSS.supports('overflow-y', 'clip') ? 'clip' : 'hidden';
 
 // Меняет содержимое блока: новое появляется с анимацией cls, а высота блока плавно
-// перетекает от старой к новой — то, что ниже, не прыгает
+// перетекает от старой к новой — то, что ниже, не прыгает.
+// Старое содержимое не пропадает мгновенно: его «призрак» плавно уезжает и гаснет поверх нового
+// (page-next — влево, page-prev — вправо, иначе просто гаснет)
 function swapContent(box, html, cls) {
   const from = box.offsetHeight; // если прошлая анимация ещё идёт — это её текущая высота
   if (box.heightAnim) box.heightAnim.cancel();
+  box.querySelectorAll('.swap-ghost').forEach((g) => g.remove()); // прошлый призрак, если не успел уйти
+
+  let ghost = null;
+  if (!reduceMotion && box.animate) {
+    ghost = document.createElement('div');
+    ghost.className = 'swap-ghost';
+    ghost.innerHTML = box.innerHTML;
+  }
   box.innerHTML = html;
   restartAnim(box, cls);
+  if (ghost) {
+    box.append(ghost);
+    const shift = cls === 'page-next' ? '-40px' : cls === 'page-prev' ? '40px' : '0px';
+    const out = ghost.animate(
+      [{ opacity: 1, transform: 'translateX(0)' }, { opacity: 0, transform: `translateX(${shift})` }],
+      { duration: 320, easing: 'cubic-bezier(.4, 0, .2, 1)', fill: 'forwards' },
+    );
+    out.onfinish = () => ghost.remove();
+  }
   const to = box.offsetHeight;
   if (from === to || reduceMotion || !box.animate) return;
 
   box.style.overflowY = CLIP_Y;
   const anim = box.animate(
     [{ height: from + 'px' }, { height: to + 'px' }],
-    { duration: 450, easing: 'cubic-bezier(.2, .9, .3, 1)' },
+    { duration: 500, easing: 'cubic-bezier(.2, .9, .3, 1)' },
   );
   box.heightAnim = anim;
   const done = () => {
@@ -654,6 +775,7 @@ document.addEventListener('pointerdown', (e) => {
   suppressClick = pendingClose;
   const wrap = e.target.closest('.swipe');
   if (!wrap || onDelete || busy) return;
+  if (e.clientX <= EDGE_ZONE && edgeAllowed()) return; // у левого края — это жест «назад», а не свайп строки
   drag = {
     wrap, id: e.pointerId, x0: e.clientX, y0: e.clientY, x: 0,
     base: wrap === openSwipe ? -SWIPE_OPEN : 0, active: false,
