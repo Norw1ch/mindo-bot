@@ -19,7 +19,7 @@ const TABS = [
     icon: icon('<path d="M6.5 3h8l4 4v12.5a1.5 1.5 0 0 1-1.5 1.5h-10.5A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3z"/><path d="M14 3v4.5h4.5M8.5 12.5h7M8.5 16.5h5"/>'),
   },
   {
-    key: 'habits', label: 'Привычки', root: { name: 'soon', title: 'Привычки' },
+    key: 'habits', label: 'Привычки', root: { name: 'habits' },
     icon: icon('<rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8.5 3v4M15.5 3v4M4 10h16M9 15.3l2 2 4-4"/>'),
   },
   {

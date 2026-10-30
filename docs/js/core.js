@@ -210,6 +210,12 @@ function keyToDate(key) {
   return new Date(y, m - 1, d);
 }
 
+// День как число (дней с 1970 года) — компактно хранить отметки привычек: «20391» вместо «2025-10-30»
+function dayNum(key = dayKey()) {
+  const [y, m, d] = key.split('-').map(Number);
+  return Date.UTC(y, m - 1, d) / 864e5;
+}
+
 function addDays(key, n) {
   const date = keyToDate(key);
   date.setDate(date.getDate() + n);
