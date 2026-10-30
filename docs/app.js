@@ -82,8 +82,32 @@ function newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
+function findIdea(id) {
+  return data.ideas.find((i) => i.id === id);
+}
+
+// Активные идеи раздела (не Done), новые сверху
+function sectionIdeas(sectionId) {
+  return data.ideas
+    .filter((i) => i.sec === sectionId && i.st !== 'done')
+    .sort((a, b) => b.at - a.at);
+}
+
 function saveSections() {
   return store.set('sections', JSON.stringify(data.sections));
+}
+
+function saveIdea(idea) {
+  return store.set('i_' + idea.id, JSON.stringify(idea));
+}
+
+async function deleteIdeaData(id) {
+  await store.remove('i_' + id);
+  data.ideas = data.ideas.filter((i) => i.id !== id);
+}
+
+function confirmDeleteIdea(id) {
+  return confirmDialog(`Удалить идею «${shorten(findIdea(id).text, 40)}»?`);
 }
 
 // Удаляет раздел вместе с его идеями: сначала идеи, потом сам раздел
@@ -214,10 +238,17 @@ function takeFlash(id) {
   return true;
 }
 
+// Статусы идей: значок и название
+const STATUS = {
+  new: { icon: '⚪', label: 'Not started' },
+  wip: { icon: '◐', label: 'In progress' },
+  done: { icon: '⚫', label: 'Done' },
+};
+
 views.main = () => {
   const rows = data.sections.map((s, n) => `
     <div class="swipe${takeFlash(s.id) ? ' appear' : ''}" style="--i:${n}">
-      <button class="swipe-del" data-act="swipe-delete" data-id="${s.id}">Удалить</button>
+      <button class="swipe-del" data-act="swipe-delete" data-kind="section" data-id="${s.id}">Удалить</button>
       <button class="row" data-act="open-section" data-id="${s.id}">
         <span class="title">${esc(s.name)}</span>
         <span class="meta">${activeCount(s.id)}</span>
@@ -239,21 +270,54 @@ views.section = (route) => {
   const s = findSection(route.id);
   if (!s) return '<p class="empty">Раздел не найден</p>';
 
+  const ideas = sectionIdeas(s.id);
+  const rows = ideas.map((idea, n) => `
+    <div class="swipe${takeFlash(idea.id) ? ' appear' : ''}" style="--i:${n}">
+      <button class="swipe-del" data-act="swipe-delete" data-kind="idea" data-id="${idea.id}">Удалить</button>
+      <button class="row" data-act="open-idea" data-id="${idea.id}">
+        <span class="st">${STATUS[idea.st].icon}</span>
+        <span class="title clamp">${esc(idea.text)}</span>
+        ${CHEVRON}
+      </button>
+    </div>`).join('');
+
   return `
     <h1${takeFlash(s.id) ? ' class="swap"' : ''}>${esc(s.name)}</h1>
-    <p class="sub">Идей пока нет</p>
+    <p class="sub">${ideas.length ? plural(ideas.length, ['идея', 'идеи', 'идей']) : 'Идей пока нет'}</p>
     <div class="actions">
-      <button class="btn primary" data-act="add-idea">➕ Добавить идею</button>
+      <button class="btn primary" data-act="add-idea" data-id="${s.id}">➕ Добавить идею</button>
     </div>
+    ${rows ? `<div class="group">${rows}</div>` : ''}
     <div class="group">
       <button class="row" data-act="rename-section" data-id="${s.id}">Переименовать</button>
       <button class="row danger" data-act="delete-section" data-id="${s.id}">Удалить раздел</button>
     </div>`;
 };
 
+views.idea = (route) => {
+  const idea = findIdea(route.id);
+  if (!idea) return '<p class="empty">Идея не найдена</p>';
+  const section = findSection(idea.sec);
+  const st = STATUS[idea.st];
+
+  return `
+    <h1>Идея</h1>
+    <p class="sub">${section ? esc(section.name) : ''}</p>
+    <div class="card">
+      <p class="status">${st.icon} ${st.label}</p>
+      <p class="idea-text${takeFlash(idea.id) ? ' swap' : ''}">${esc(idea.text)}</p>
+      <p class="date">Создана ${formatDate(idea.at)}</p>
+    </div>
+    <div class="group">
+      <button class="row" data-act="edit-idea" data-id="${idea.id}">Изменить текст</button>
+      <button class="row danger" data-act="delete-idea" data-id="${idea.id}">Удалить идею</button>
+    </div>`;
+};
+
 // ---------- Действия по нажатию ----------
 
 const SECTION_MAX = 50;
+const IDEA_MAX = 3000; // в облаке Telegram на одну запись — до 4096 символов
 
 const actions = {
   'back': back,
@@ -288,19 +352,49 @@ const actions = {
     await commit(() => deleteSectionData(id), back); // потом возвращаемся на главный экран
   },
 
-  // Удаление свайпом на главном экране
-  'swipe-delete': async ({ id }, el) => {
-    if (!(await confirmDeleteSection(id))) {
+  // Удаление свайпом: раздела на главном экране или идеи в разделе
+  'swipe-delete': async ({ id, kind }, el) => {
+    const isIdea = kind === 'idea';
+    const ok = isIdea ? await confirmDeleteIdea(id) : await confirmDeleteSection(id);
+    if (!ok) {
       closeSwipe();
       return;
     }
     openSwipe = null;
     await collapse(el.closest('.swipe'));
-    await commit(() => deleteSectionData(id));
+    await commit(() => (isIdea ? deleteIdeaData(id) : deleteSectionData(id)));
   },
 
-  // Заглушки: появятся на следующих этапах
-  'add-idea': () => toast('Будет на следующем этапе'),
+  'add-idea': async ({ id }) => {
+    const text = await ask({ title: 'Новая идея', placeholder: 'Текст идеи', max: IDEA_MAX, multiline: true });
+    if (!text) return;
+    const idea = { id: newId(), sec: id, text, st: 'new', at: Date.now() };
+    flash = idea.id;
+    await commit(() => {
+      data.ideas.push(idea);
+      return saveIdea(idea);
+    });
+  },
+
+  'open-idea': ({ id }) => go({ name: 'idea', id }),
+
+  'edit-idea': async ({ id }) => {
+    const idea = findIdea(id);
+    const text = await ask({ title: 'Изменить идею', value: idea.text, max: IDEA_MAX, multiline: true });
+    if (!text || text === idea.text) return;
+    flash = id;
+    await commit(() => {
+      idea.text = text;
+      return saveIdea(idea);
+    });
+  },
+
+  'delete-idea': async ({ id }) => {
+    if (!(await confirmDeleteIdea(id))) return;
+    await commit(() => deleteIdeaData(id), back); // потом возвращаемся в раздел
+  },
+
+  // Заглушка: появится на следующем этапе
   'open-archive': () => toast('Будет на следующем этапе'),
 };
 
@@ -492,9 +586,9 @@ document.getElementById('sheet-save').addEventListener('click', saveSheet);
 document.getElementById('sheet-cancel').addEventListener('click', () => closeSheet(null));
 // Нажатие на затемнённый фон — отмена
 sheet.addEventListener('click', (e) => { if (e.target === sheet) closeSheet(null); });
-// В однострочном поле Enter сохраняет
+// В однострочном поле Enter сохраняет, в многострочном — Ctrl+Enter
 sheetInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !sheetMultiline) {
+  if (e.key === 'Enter' && (!sheetMultiline || e.ctrlKey || e.metaKey)) {
     e.preventDefault();
     saveSheet();
   }
@@ -513,6 +607,28 @@ function esc(text) {
   return String(text).replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
+}
+
+// Обрезает длинный текст до n символов (для вопросов «Удалить …?»)
+function shorten(text, n) {
+  const line = text.replace(/\s+/g, ' ').trim();
+  return line.length > n ? line.slice(0, n - 1) + '…' : line;
+}
+
+// 1 идея, 2 идеи, 5 идей
+function plural(n, [one, few, many]) {
+  const d = n % 10;
+  const dd = n % 100;
+  const word = d === 1 && dd !== 11 ? one : d >= 2 && d <= 4 && (dd < 12 || dd > 14) ? few : many;
+  return `${n} ${word}`;
+}
+
+// «30 октября», а для прошлых лет — «30 октября 2025 г.»
+function formatDate(ms) {
+  const date = new Date(ms);
+  const opts = { day: 'numeric', month: 'long' };
+  if (date.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return date.toLocaleDateString('ru-RU', opts);
 }
 
 function wait(ms) {
