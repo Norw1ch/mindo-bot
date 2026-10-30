@@ -3,8 +3,9 @@
 // Модуль «Привычки»: отметка за день, серия дней подряд, календарь
 
 // ---------- Данные ----------
-// habits.items: [{id, name, days, best, old, at}] — пачками в ключах habits_0, habits_1, …
+// habits.items: [{id, name, days, wd, best, old, at}] — пачками в ключах habits_0, habits_1, …
 //   days — отмеченные дни числами (dayNum), только за последние KEEP_DAYS дней;
+//   wd — дни недели по графику (0 — пн … 6 — вс) или пусто, если каждый день;
 //   old — сколько отметок было раньше (уже не храним по дням), best — лучшая серия из старых дней
 
 const habits = makeBucket('habits_');
@@ -16,6 +17,16 @@ modules.habits = { load: (raw) => habits.load(raw) };
 
 function isDone(h, num) {
   return h.days.includes(num);
+}
+
+// День недели дня-числа: 0 — понедельник … 6 — воскресенье
+function weekdayOf(num) {
+  return (new Date(num * 864e5).getUTCDay() + 6) % 7;
+}
+
+// Нужно ли выполнять привычку в этот день по графику
+function isScheduled(h, num) {
+  return !h.wd || h.wd.includes(weekdayOf(num));
 }
 
 // Отметить или снять день. Слишком старые дни сворачиваем в счётчики, чтобы запись не росла бесконечно
@@ -33,29 +44,53 @@ function toggleDay(h, num) {
   }
 }
 
-// Текущая серия: дни подряд до сегодня. Если сегодня ещё не отмечено, серия жива со вчерашнего дня
+// Текущая серия: выполненные дни по графику подряд, считая назад от сегодня.
+// Дни вне графика пропускаем — они серию не сбивают. Сегодня ещё не отмечено — серия жива до вечера
 function streak(h) {
   const set = new Set(h.days);
-  let d = dayNum();
-  if (!set.has(d)) d -= 1;
+  const today = dayNum();
   let n = 0;
-  while (set.has(d)) {
-    n += 1;
-    d -= 1;
+  for (let d = today; d > today - KEEP_DAYS; d--) {
+    if (!isScheduled(h, d)) continue;
+    if (set.has(d)) n += 1;
+    else if (d !== today) break;
   }
   return n;
 }
 
+// Лучшая серия по тем же правилам (и с учётом серий из уже свёрнутой истории)
 function bestStreak(h) {
   let best = h.best || 0;
+  if (!h.days.length) return best;
+  const set = new Set(h.days);
+  const today = dayNum();
   let run = 0;
-  let prev = null;
-  for (const d of h.days) {
-    run = prev !== null && d === prev + 1 ? run + 1 : 1;
-    prev = d;
-    best = Math.max(best, run);
+  for (let d = h.days[0]; d <= today; d++) {
+    if (!isScheduled(h, d)) continue;
+    if (set.has(d)) {
+      run += 1;
+      best = Math.max(best, run);
+    } else if (d !== today) {
+      run = 0;
+    }
   }
   return best;
+}
+
+const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+// «Каждый день», «По будням», «По выходным» или «Пн, Ср, Пт»
+function scheduleLabel(wd) {
+  if (!wd) return 'Каждый день';
+  const key = wd.join();
+  if (key === '0,1,2,3,4') return 'По будням';
+  if (key === '5,6') return 'По выходным';
+  return wd.map((i) => WEEKDAYS[i]).join(', ');
+}
+
+// Серия: для ежедневных — «5 дн.», для привычек по графику — просто «5» (это разы, а не дни)
+function streakText(h, n) {
+  return h.wd ? `${n}` : `${n} дн.`;
 }
 
 function totalDone(h) {
@@ -79,32 +114,40 @@ function daysWord(n) {
   return plural(n, ['день', 'дня', 'дней']);
 }
 
-// «Сегодня: 2 из 5»
+// «Сегодня: 2 из 5» — считаем только привычки, запланированные на сегодня
 function habitsSummary() {
+  if (!habits.items.length) return 'Привычек пока нет';
   const today = dayNum();
-  const done = habits.items.filter((h) => isDone(h, today)).length;
-  return habits.items.length ? `Сегодня: ${done} из ${habits.items.length}` : 'Привычек пока нет';
+  const planned = habits.items.filter((h) => isScheduled(h, today));
+  if (!planned.length) return 'Сегодня по графику ничего';
+  const done = planned.filter((h) => isDone(h, today)).length;
+  return `Сегодня: ${done} из ${planned.length}`;
 }
 
-// Название, 7 точек за неделю (сегодня — последняя) и серия
+// Название, 7 точек за неделю (сегодня — последняя; дни вне графика бледнее), график и серия
 function habitInfoHtml(h) {
   const today = dayNum();
   const dots = Array.from({ length: 7 }, (_, i) => {
     const d = today - 6 + i;
-    return `<span class="dot${isDone(h, d) ? ' on' : ''}${d === today ? ' today' : ''}"></span>`;
+    const cls = `${isDone(h, d) ? ' on' : ''}${d === today ? ' today' : ''}${isScheduled(h, d) ? '' : ' off'}`;
+    return `<span class="dot${cls}"></span>`;
   }).join('');
   const s = streak(h);
+  const info = [h.wd ? scheduleLabel(h.wd) : '', s ? `серия ${streakText(h, s)}` : ''].filter(Boolean).join(' · ');
   return `
     <span class="habit-name">${esc(h.name)}</span>
-    <span class="habit-meta"><span class="dots">${dots}</span>${s ? `серия ${s} дн.` : ''}</span>`;
+    <span class="habit-meta"><span class="dots">${dots}</span>${info}</span>`;
 }
 
 function habitRowHtml(h, n) {
-  const done = isDone(h, dayNum());
+  const today = dayNum();
+  const done = isDone(h, today);
+  // Сегодня не по графику — строка приглушена (отметить всё равно можно)
+  const rest = isScheduled(h, today) ? '' : ' rest';
   return `
     <div class="swipe${takeFlash(h.id) ? ' appear' : ''}" style="--i:${n}">
       <button class="swipe-del" data-act="swipe-delete" data-kind="habit" data-id="${h.id}">Удалить</button>
-      <div class="row habit-row">
+      <div class="row habit-row${rest}">
         <button class="habit-open" data-act="open-habit" data-id="${h.id}">${habitInfoHtml(h)}</button>
         <button class="habit-check${done ? ' checked' : ''}" data-act="toggle-habit-today" data-id="${h.id}">${CHECK}</button>
       </div>
@@ -117,8 +160,6 @@ function statsHtml(h) {
     <div class="stat"><b>${bestStreak(h)}</b><span>Лучшая</span></div>
     <div class="stat"><b>${totalDone(h)}</b><span>Всего</span></div>`;
 }
-
-const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
 // Календарь месяца: route.month — сдвиг от текущего месяца (0 — этот, -1 — прошлый)
 function calendarHtml(h, route) {
@@ -136,7 +177,7 @@ function calendarHtml(h, route) {
   for (let i = 0; i < offset; i++) cells.push('<span></span>');
   for (let d = 1; d <= daysIn; d++) {
     const num = Date.UTC(y, m, d) / 864e5;
-    const cls = `${isDone(h, num) ? ' done' : ''}${num === today ? ' today' : ''}`;
+    const cls = `${isDone(h, num) ? ' done' : ''}${num === today ? ' today' : ''}${isScheduled(h, num) ? '' : ' off'}`;
     cells.push(`<button class="cal-day${cls}" data-act="toggle-habit-day" data-id="${h.id}" data-day="${num}"${num > today ? ' disabled' : ''}>${d}</button>`);
   }
   return `
@@ -173,6 +214,13 @@ views.habit = (route) => {
     <div class="stats">${statsHtml(h)}</div>
     <div class="cal paged">${calendarHtml(h, route)}</div>
     <div class="group">
+      <button class="row" data-act="habit-days" data-id="${h.id}">
+        <span class="title">Дни</span>
+        <span class="meta${takeFlash('wd:' + h.id) ? ' swap' : ''}">${scheduleLabel(h.wd)}</span>
+        ${CHEVRON}
+      </button>
+    </div>
+    <div class="group">
       <button class="row danger" data-act="delete-habit" data-id="${h.id}">Удалить привычку</button>
     </div>`;
 };
@@ -191,14 +239,47 @@ editors['habit-name'] = {
 // Поздравление на круглых сериях
 function cheer(h) {
   const s = streak(h);
-  if (isDone(h, dayNum()) && MILESTONES.includes(s)) toast(`Серия ${daysWord(s)} подряд!`);
+  if (!isDone(h, dayNum()) || !MILESTONES.includes(s)) return;
+  toast(`Серия ${h.wd ? plural(s, ['раз', 'раза', 'раз']) : daysWord(s)} подряд!`);
 }
+
+// Выбор дней недели в меню снизу: кружки Пн–Вс, «Каждый день» и «Готово».
+// Возвращает null — каждый день, массив дней — по графику, undefined — отмена
+async function pickDays(current) {
+  const chosen = new Set(current || [0, 1, 2, 3, 4, 5, 6]);
+  const result = choose({ title: 'В какие дни', options: [{ key: 'ok', label: 'Готово' }] });
+  const chips = WEEKDAYS.map((d, i) => `<button class="day-chip${chosen.has(i) ? ' on' : ''}" data-wd="${i}">${d}</button>`).join('');
+  document.getElementById('choice-opts').insertAdjacentHTML('afterbegin', `
+    <div class="day-pick">
+      <div class="day-chips">${chips}</div>
+      <button class="day-all">Каждый день</button>
+    </div>`);
+  if ((await result) !== 'ok') return undefined;
+  const wd = [...document.querySelectorAll('.day-chip.on')].map((b) => Number(b.dataset.wd));
+  return wd.length === 7 ? null : wd;
+}
+
+// Нажатия внутри выбора дней: включить/выключить день (хотя бы один остаётся), «Каждый день» — все
+document.addEventListener('click', (e) => {
+  const chip = e.target.closest('.day-chip');
+  if (chip) {
+    const on = document.querySelectorAll('.day-chip.on').length;
+    if (chip.classList.contains('on') && on === 1) return; // последний день не выключаем
+    chip.classList.toggle('on');
+    softHaptic();
+  } else if (e.target.closest('.day-all')) {
+    document.querySelectorAll('.day-chip').forEach((b) => b.classList.add('on'));
+    softHaptic();
+  }
+});
 
 Object.assign(actions, {
   'new-habit': async () => {
     const res = await ask({ title: 'Новая привычка', fields: [{ placeholder: 'Например, «Зарядка»', max: HABIT_NAME_MAX }] });
     if (!res) return;
-    const habit = { id: newId(), name: res[0], days: [], best: 0, old: 0, at: Date.now() };
+    // Сразу спрашиваем дни; «Отмена» здесь — значит каждый день
+    const wd = await pickDays(null);
+    const habit = { id: newId(), name: res[0], days: [], wd: wd || null, best: 0, old: 0, at: Date.now() };
     flash = habit.id;
     await commit(() => {
       habits.items.push(habit);
@@ -241,6 +322,18 @@ Object.assign(actions, {
     const box = el.closest('.cal');
     swapContent(box, calendarHtml(habits.find(route.id), route), Number(dir) > 0 ? 'page-next' : 'page-prev');
     softHaptic();
+  },
+
+  // Поменять график: каждый день или выбранные дни недели
+  'habit-days': async ({ id }) => {
+    const h = habits.find(id);
+    const wd = await pickDays(h.wd);
+    if (wd === undefined || (wd || []).join() === (h.wd || []).join()) return;
+    flash = 'wd:' + id;
+    await commit(() => {
+      h.wd = wd;
+      return habits.save();
+    });
   },
 
   'delete-habit': async ({ id }) => {

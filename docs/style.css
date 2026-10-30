@@ -271,6 +271,23 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .habit-check .check { width: 34px; height: 34px; }
 .habit-check .check svg { width: 20px; height: 20px; }
 .habit-check.just.checked .check { animation: check-pop .4s var(--soft); }
+/* Сегодня не по графику — строка приглушена */
+.habit-row.rest .habit-name, .habit-row.rest .habit-check { opacity: 0.5; }
+/* День вне графика — точка меньше и бледнее */
+.dot.off:not(.on) { transform: scale(0.6); opacity: 0.6; }
+.cal-day.off:not(.done):not(:disabled) { color: var(--faint); }
+
+/* Выбор дней недели */
+.day-pick { padding: 4px 14px 14px; }
+.day-chips { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.day-chip {
+  justify-self: center; width: 40px; height: 40px; border-radius: 50%;
+  background: var(--field); font-size: 14px; font-weight: 500;
+  transition: background-color .25s ease, color .25s ease, transform .3s var(--soft);
+}
+.day-chip.on { background: var(--inv-bg); color: var(--inv-fg); }
+.day-chip:active { transform: scale(0.88); transition-duration: .1s; }
+.day-all { display: block; margin: 12px auto 0; color: var(--muted); font-size: 15px; }
 
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
 .stat { padding: 14px 8px 12px; border-radius: 18px; background: var(--cell); text-align: center; }
