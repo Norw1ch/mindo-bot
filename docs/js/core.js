@@ -68,6 +68,69 @@ function parse(value) {
   try { return JSON.parse(value); } catch { return null; }
 }
 
+// Ошибка с понятным текстом для человека — commit покажет его в подсказке
+function userError(message) {
+  const err = new Error(message);
+  err.userMessage = message;
+  return err;
+}
+
+// ---------- Коллекция «пачками» ----------
+// Записи модуля (заметки, списки, …) складываются по нескольку в одну запись облака:
+// prefix0, prefix1, … — каждая до CHUNK_MAX символов. Так сотня заметок занимает
+// несколько записей из 1024 доступных, а не сотню
+
+const CHUNK_MAX = 3900;
+
+function makeBucket(prefix) {
+  return {
+    items: [],
+    chunks: [], // как пачки лежат в хранилище сейчас — чтобы перезаписывать только изменённые
+
+    load(raw) {
+      const num = (k) => Number(k.slice(prefix.length));
+      const keys = Object.keys(raw)
+        .filter((k) => k.startsWith(prefix) && /^\d+$/.test(k.slice(prefix.length)))
+        .sort((a, b) => num(a) - num(b));
+      this.chunks = keys.map((k) => raw[k]);
+      // Если прошлое сохранение оборвалось на середине, запись могла попасть в две пачки — берём первую
+      const seen = new Set();
+      this.items = this.chunks.flatMap((c) => parse(c) || []).filter((item) => {
+        if (!item || seen.has(item.id)) return false;
+        seen.add(item.id);
+        return true;
+      });
+    },
+
+    async save() {
+      const next = [];
+      let pack = [];
+      let size = 2;
+      for (const item of this.items) {
+        const len = JSON.stringify(item).length + 1;
+        if (len + 2 > CHUNK_MAX) throw userError('Слишком много текста');
+        if (pack.length && size + len > CHUNK_MAX) {
+          next.push(JSON.stringify(pack));
+          pack = [];
+          size = 2;
+        }
+        pack.push(item);
+        size += len;
+      }
+      if (pack.length) next.push(JSON.stringify(pack));
+      for (let i = 0; i < next.length; i++) {
+        if (next[i] !== this.chunks[i]) await store.set(prefix + i, next[i]);
+      }
+      for (let i = next.length; i < this.chunks.length; i++) await store.remove(prefix + i);
+      this.chunks = next;
+    },
+
+    find(id) {
+      return this.items.find((i) => i.id === id);
+    },
+  };
+}
+
 function newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
@@ -195,6 +258,36 @@ function dayLabelLong(key) {
   if (date.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
   const text = date.toLocaleDateString('ru-RU', opts);
   return text[0].toUpperCase() + text.slice(1);
+}
+
+// Когда изменено, коротко: сегодня — «14:05», вчера — «Вчера», раньше — «28 окт.»
+function whenLabel(ms) {
+  const key = dayKey(new Date(ms));
+  if (key === dayKey()) {
+    return new Date(ms).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  }
+  return key === addDays(dayKey(), -1) ? 'Вчера' : formatShort(ms);
+}
+
+// Скопировать текст в буфер обмена; если новый способ недоступен — старым
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch { /* пробуем по-старому */ }
+  try {
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.append(area);
+    area.select();
+    const ok = document.execCommand('copy');
+    area.remove();
+    return ok;
+  } catch {
+    return false;
+  }
 }
 
 function wait(ms) {
