@@ -550,8 +550,7 @@ const actions = {
     closeSwipe(false);
     moveSeg(el.closest('.seg'), key);
     const box = el.closest('.screen-inner').querySelector('.paged');
-    box.innerHTML = ideaListHtml(route);
-    restartAnim(box, 'list-swap');
+    swapContent(box, ideaListHtml(route), 'list-swap');
   },
 
   // Листание страниц: новая страница въезжает справа (вперёд) или слева (назад)
@@ -560,8 +559,8 @@ const actions = {
     route.page = (route.page || 0) + Number(dir);
     closeSwipe(false);
     const box = el.closest('.paged');
-    box.innerHTML = route.name === 'archive' ? archiveListHtml(route) : ideaListHtml(route);
-    restartAnim(box, Number(dir) > 0 ? 'page-next' : 'page-prev');
+    const html = route.name === 'archive' ? archiveListHtml(route) : ideaListHtml(route);
+    swapContent(box, html, Number(dir) > 0 ? 'page-next' : 'page-prev');
     softHaptic();
     // Если начало списка ушло вверх за экран — плавно поднимаемся к нему
     if (box.getBoundingClientRect().top < 0) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -720,6 +719,33 @@ function restartAnim(el, cls) {
   el.classList.remove('list-swap', 'page-next', 'page-prev');
   void el.offsetWidth; // без этого анимация с тем же классом не повторится
   el.classList.add(cls);
+}
+
+// Обрезать по вертикали, не обрезая боковой въезд страницы (в старых браузерах — просто обрезать)
+const CLIP_Y = window.CSS && CSS.supports('overflow-y', 'clip') ? 'clip' : 'hidden';
+
+// Меняет содержимое блока: новое появляется с анимацией cls, а высота блока плавно
+// перетекает от старой к новой — то, что ниже, не прыгает
+function swapContent(box, html, cls) {
+  const from = box.offsetHeight; // если прошлая анимация ещё идёт — это её текущая высота
+  if (box.heightAnim) box.heightAnim.cancel();
+  box.innerHTML = html;
+  restartAnim(box, cls);
+  const to = box.offsetHeight;
+  if (from === to || reduceMotion || !box.animate) return;
+
+  box.style.overflowY = CLIP_Y;
+  const anim = box.animate(
+    [{ height: from + 'px' }, { height: to + 'px' }],
+    { duration: 450, easing: 'cubic-bezier(.2, .9, .3, 1)' },
+  );
+  box.heightAnim = anim;
+  const done = () => {
+    if (box.heightAnim !== anim) return; // уже началась новая анимация
+    box.heightAnim = null;
+    box.style.overflowY = '';
+  };
+  anim.finished.then(done, done);
 }
 
 // Плавно схлопывает строку списка
