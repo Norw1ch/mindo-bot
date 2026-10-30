@@ -127,6 +127,26 @@ function addDays(key, n) {
   return dayKey(date);
 }
 
+// Следующая дата повтора после key. rep: day / weekdays / week / month / year.
+// anchor — «родное» число месяца: после 28 февраля месячный повтор вернётся на 31-е
+function stepRepeat(key, rep, anchor) {
+  const date = keyToDate(key);
+  if (rep === 'month' || rep === 'year') {
+    const y = date.getFullYear() + (rep === 'year' ? 1 : 0);
+    const m = date.getMonth() + (rep === 'month' ? 1 : 0);
+    const last = new Date(y, m + 1, 0).getDate(); // дней в том месяце
+    return dayKey(new Date(y, m, Math.min(anchor || date.getDate(), last)));
+  }
+  if (rep === 'week') {
+    date.setDate(date.getDate() + 7);
+  } else {
+    date.setDate(date.getDate() + 1);
+    // По будням — пропускаем субботу (6) и воскресенье (0)
+    while (rep === 'weekdays' && (date.getDay() === 0 || date.getDay() === 6)) date.setDate(date.getDate() + 1);
+  }
+  return dayKey(date);
+}
+
 // Коротко: «Сегодня», «Завтра», «Вчера», иначе «5 нояб.»
 function dayLabel(key) {
   const today = dayKey();

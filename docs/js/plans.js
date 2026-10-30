@@ -8,7 +8,9 @@
 // sections: [{id, name}] — в ключе "sections"
 // ideas: {id, sec, title, text, st, at, dt, due, items} — каждый план в своём ключе "i_<id>"
 //   st — статус (new / wip / done), at — когда создан, dt — когда выполнен,
-//   due — срок «2026-10-30» или пусто, items — чеклист [{id, t: текст, d: отмечен}]
+//   due — срок «2026-10-30» или пусто, items — чеклист [{id, t: текст, d: отмечен}],
+//   rep — повтор (day / weekdays / week / month / year), rd — число месяца для повтора,
+//   cnt — сколько раз выполнен повторяющийся план
 
 const data = { sections: [], ideas: [] };
 
@@ -65,6 +67,23 @@ function filteredIdeas(sectionId, filter) {
 // Срок прошёл, а план не выполнен
 function isOverdue(idea) {
   return Boolean(idea.due) && idea.st !== 'done' && idea.due < dayKey();
+}
+
+const REPEATS = {
+  day: 'Каждый день',
+  weekdays: 'По будням',
+  week: 'Каждую неделю',
+  month: 'Каждый месяц',
+  year: 'Каждый год',
+};
+
+// Следующая дата повторяющегося плана — всегда после сегодняшнего дня,
+// даже если план был просрочен на несколько повторов
+function nextOccurrence(idea) {
+  const today = dayKey();
+  let next = stepRepeat(idea.due || today, idea.rep, idea.rd);
+  while (next <= today) next = stepRepeat(next, idea.rep, idea.rd);
+  return next;
 }
 
 // Активные планы со сроком, по порядку дат (просроченные первыми)
@@ -220,7 +239,7 @@ function checklistHtml(idea) {
 // Срок справа в строке: «Завтра», «5 нояб.»; просроченный — красным
 function dueMeta(idea) {
   if (!idea.due || idea.st === 'done') return '';
-  return `<span class="meta small${isOverdue(idea) ? ' late' : ''}">${dayLabel(idea.due)}</span>`;
+  return `<span class="meta small${isOverdue(idea) ? ' late' : ''}">${idea.rep ? '↻ ' : ''}${dayLabel(idea.due)}</span>`;
 }
 
 // «Выполненные»: все Done по порядку разделов, на странице группируются по разделам
@@ -243,7 +262,7 @@ function agendaRowHtml(idea, withDue) {
         <span class="title">${esc(idea.title)}</span>
         <span class="subtitle">${section ? esc(section.name) : ''}</span>
       </span>
-      ${withDue ? dueMeta(idea) : ''}
+      ${withDue ? dueMeta(idea) : (idea.rep ? '<span class="meta small">↻</span>' : '')}
       ${CHEVRON}
     </button>`;
 }
@@ -299,7 +318,35 @@ function doneRowHtml(idea, n) {
 
 function dateLine(idea) {
   const done = idea.st === 'done' && idea.dt ? ` · выполнен ${formatDate(idea.dt)}` : '';
-  return `Создан ${formatDate(idea.at)}${done}`;
+  const times = idea.cnt ? ` · сделано ${plural(idea.cnt, ['раз', 'раза', 'раз'])}` : '';
+  return `Создан ${formatDate(idea.at)}${done}${times}`;
+}
+
+// Повторяющийся план «выполнен»: таблетка доезжает до Done, план переезжает на следующую дату,
+// чеклист сбрасывается, затем таблетка плавно возвращается на Not started
+async function completeRecurring(idea, seg) {
+  moveSeg(seg, 'done');
+  const next = nextOccurrence(idea);
+  const ok = await commit(() => {
+    idea.st = 'new';
+    idea.dt = null;
+    idea.due = next;
+    idea.cnt = (idea.cnt || 0) + 1;
+    (idea.items || []).forEach((i) => { i.d = false; });
+    return saveIdea(idea);
+  }, () => {});
+  if (!ok) {
+    refresh();
+    return;
+  }
+  toast(`Готово! Следующий раз — ${dayLabel(next).toLowerCase()}`);
+  await wait(650);
+  const route = currentRoute();
+  if (route.name !== 'idea' || route.id !== idea.id) return; // уже ушли с карточки
+  moveSeg(seg, 'new');
+  await wait(450);
+  flash = 'due:' + idea.id;
+  refresh();
 }
 
 // ---------- Экраны ----------
@@ -378,6 +425,11 @@ views.idea = (route) => {
       <button class="row" data-act="set-due" data-id="${idea.id}">
         <span class="title">Срок</span>
         <span class="meta${isOverdue(idea) ? ' late' : ''}${takeFlash('due:' + idea.id) ? ' swap' : ''}">${idea.due ? dayLabel(idea.due) : 'Не задан'}</span>
+        ${CHEVRON}
+      </button>
+      <button class="row" data-act="set-repeat" data-id="${idea.id}">
+        <span class="title">Повтор</span>
+        <span class="meta${takeFlash('rep:' + idea.id) ? ' swap' : ''}">${idea.rep ? REPEATS[idea.rep] : 'Нет'}</span>
         ${CHEVRON}
       </button>
     </div>
@@ -483,6 +535,10 @@ Object.assign(actions, {
   'set-status': async ({ id, key }, el) => {
     const idea = findIdea(id);
     if (!idea || idea.st === key) return;
+    if (key === 'done' && idea.rep) {
+      await completeRecurring(idea, el.closest('.seg'));
+      return;
+    }
     const inner = el.closest('.screen-inner');
     moveSeg(el.closest('.seg'), key);
     const ok = await commit(() => {
@@ -589,9 +645,36 @@ Object.assign(actions, {
     const due = picked === 'none' ? null : picked;
     if (due === (idea.due || null)) return;
     flash = 'due:' + id;
+    // Повтор без срока не работает — убирая срок, выключаем и повтор
+    const stopRepeat = !due && idea.rep;
     await commit(() => {
       idea.due = due;
+      if (stopRepeat) idea.rep = null;
+      if (due && idea.rep) idea.rd = keyToDate(due).getDate();
       return saveIdea(idea);
     });
+    if (stopRepeat) toast('Повтор выключен');
+  },
+
+  // Повтор: каждый день / по будням / неделю / месяц / год
+  'set-repeat': async ({ id }) => {
+    const idea = findIdea(id);
+    const options = [
+      { key: 'none', label: 'Не повторять', checked: !idea.rep },
+      ...Object.entries(REPEATS).map(([key, label]) => ({ key, label, checked: idea.rep === key })),
+    ];
+    const picked = await choose({ title: 'Повтор', options });
+    if (!picked) return;
+    const rep = picked === 'none' ? null : picked;
+    if (rep === (idea.rep || null)) return;
+    flash = rep && !idea.due ? new Set(['rep:' + id, 'due:' + id]) : 'rep:' + id;
+    const needDue = Boolean(rep && !idea.due); // у повтора должен быть срок — ставим «сегодня»
+    await commit(() => {
+      idea.rep = rep;
+      if (needDue) idea.due = dayKey();
+      if (rep) idea.rd = keyToDate(idea.due).getDate();
+      return saveIdea(idea);
+    });
+    if (needDue) toast('Срок — сегодня');
   },
 });

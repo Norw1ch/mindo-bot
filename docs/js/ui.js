@@ -553,7 +553,8 @@ const choiceOpts = document.getElementById('choice-opts');
 let choiceResolve = null;
 let choiceTimer;
 
-// options: [{ key, label, danger }] или { label, date: '2026-10-30' } — пункт с календарём.
+// options: [{ key, label, danger, checked }] или { label, date: '2026-10-30' } — пункт с календарём.
+// checked — отметить пункт галочкой (текущий выбор).
 // Возвращает key выбранного пункта, выбранную дату или null при отмене
 function choose({ title, options }) {
   clearTimeout(choiceTimer);
@@ -562,7 +563,7 @@ function choose({ title, options }) {
   choiceOpts.innerHTML = options.map((o) => (o.date !== undefined
     // Невидимое поле даты поверх пункта: нажатие открывает системный календарь
     ? `<label class="choice-opt">${esc(o.label)}<input type="date" class="choice-date" value="${o.date}"></label>`
-    : `<button class="choice-opt${o.danger ? ' danger' : ''}" data-key="${o.key}">${esc(o.label)}</button>`)).join('');
+    : `<button class="choice-opt${o.danger ? ' danger' : ''}" data-key="${o.key}">${esc(o.label)}${o.checked ? '<span class="choice-check">✓</span>' : ''}</button>`)).join('');
   choice.classList.remove('closing');
   choice.classList.add('open');
   return new Promise((resolve) => {

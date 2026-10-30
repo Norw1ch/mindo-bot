@@ -326,6 +326,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .choice-opt::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 0.5px; background: var(--sep); }
 .choice-opt:active { background: var(--cell-press); transition: none; }
 .choice-opt.danger { color: var(--red); }
+.choice-check { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); font-size: 17px; }
 /* Невидимое поле даты поверх пункта «Выбрать дату…» */
 .choice-date {
   position: absolute; inset: 0; width: 100%; height: 100%;
