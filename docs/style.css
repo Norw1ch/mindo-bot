@@ -57,6 +57,29 @@ h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; word-break: bre
 .btn.primary { background: var(--inv-bg); border-color: var(--inv-bg); color: var(--inv-fg); }
 .btn.quiet { border-color: var(--line); color: var(--muted); }
 
+/* Мелкие действия внизу экрана */
+.tools { display: flex; justify-content: center; gap: 28px; margin-top: 32px; }
+.link { padding: 6px 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; }
+.link:active { opacity: 0.5; }
+
+/* Окно ввода */
+.sheet {
+  position: fixed; inset: 0; z-index: 10;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 12vh 16px 0; background: rgba(0, 0, 0, 0.45);
+}
+.sheet[hidden] { display: none; }
+.sheet-box { width: 100%; max-width: 528px; padding: 18px 16px 16px; border-radius: 14px; background: var(--bg); }
+.sheet-title { margin-bottom: 12px; font-weight: 600; }
+.sheet textarea {
+  display: block; width: 100%; padding: 12px; resize: none;
+  border: 1px solid var(--line); border-radius: 10px; outline: none;
+  background: var(--soft); color: var(--fg); font: inherit;
+}
+.sheet textarea:focus { border-color: var(--muted); }
+.sheet-actions { display: flex; gap: 10px; margin-top: 12px; }
+.sheet-actions .btn { margin-top: 0; }
+
 /* Всплывающая подсказка */
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px);

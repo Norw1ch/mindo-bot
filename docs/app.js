@@ -72,6 +72,31 @@ function activeCount(sectionId) {
   return data.ideas.filter((i) => i.sec === sectionId && i.st !== 'done').length;
 }
 
+function findSection(id) {
+  return data.sections.find((s) => s.id === id);
+}
+
+function newId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function saveSections() {
+  return store.set('sections', JSON.stringify(data.sections));
+}
+
+// Выполняет изменение и сохранение. При ошибке перечитывает данные, чтобы экран не врал
+async function commit(change) {
+  try {
+    await change();
+    haptic();
+  } catch (err) {
+    console.error(err);
+    toast('Не удалось сохранить');
+    await loadData().catch(() => {});
+  }
+  render();
+}
+
 // ---------- Навигация ----------
 // Стек экранов: последний — текущий. «Назад» убирает верхний.
 
@@ -83,7 +108,9 @@ function go(route) {
 }
 
 function back() {
-  if (stack.length > 1) {
+  if (sheetResolve) {
+    closeSheet(null);
+  } else if (stack.length > 1) {
     stack.pop();
     render();
   }
@@ -110,13 +137,68 @@ views.main = () => {
     </div>`;
 };
 
+views.section = (route) => {
+  const s = findSection(route.id);
+  if (!s) return '<p class="empty">Раздел не найден</p>';
+
+  return `
+    <h1>${esc(s.name)}</h1>
+    <p class="sub">Идей пока нет</p>
+    <div class="actions">
+      <button class="btn primary" data-act="add-idea">➕ Добавить идею</button>
+    </div>
+    <div class="tools">
+      <button class="link" data-act="rename-section" data-id="${s.id}">✎ Переименовать</button>
+      <button class="link" data-act="delete-section" data-id="${s.id}">× Удалить</button>
+    </div>`;
+};
+
 // ---------- Действия по нажатию ----------
+
+const SECTION_MAX = 50;
 
 const actions = {
   'back': back,
+
+  'open-section': ({ id }) => go({ name: 'section', id }),
+
+  'new-section': async () => {
+    const name = await ask({ title: 'Новый раздел', placeholder: 'Название', max: SECTION_MAX });
+    if (!name) return;
+    await commit(() => {
+      data.sections.push({ id: newId(), name });
+      return saveSections();
+    });
+  },
+
+  'rename-section': async ({ id }) => {
+    const s = findSection(id);
+    const name = await ask({ title: 'Переименовать раздел', value: s.name, max: SECTION_MAX });
+    if (!name || name === s.name) return;
+    await commit(() => {
+      s.name = name;
+      return saveSections();
+    });
+  },
+
+  'delete-section': async ({ id }) => {
+    const s = findSection(id);
+    const ideas = data.ideas.filter((i) => i.sec === id);
+    const extra = ideas.length ? `\nВместе с ним удалятся идеи: ${ideas.length}.` : '';
+    if (!(await confirmDialog(`Удалить раздел «${s.name}»?${extra}`))) return;
+
+    stack.pop(); // после удаления возвращаемся на главный экран
+    await commit(async () => {
+      // Сначала идеи, потом сам раздел
+      for (const idea of ideas) await store.remove('i_' + idea.id);
+      data.ideas = data.ideas.filter((i) => i.sec !== id);
+      data.sections = data.sections.filter((x) => x.id !== id);
+      await saveSections();
+    });
+  },
+
   // Заглушки: появятся на следующих этапах
-  'open-section': () => toast('Будет на следующем этапе'),
-  'new-section': () => toast('Будет на следующем этапе'),
+  'add-idea': () => toast('Будет на следующем этапе'),
   'open-archive': () => toast('Будет на следующем этапе'),
 };
 
@@ -138,11 +220,73 @@ function render() {
     ? '<button class="back" data-act="back">← Назад</button>' : '';
   app.innerHTML = backLink + views[route.name](route);
   window.scrollTo(0, 0);
+  updateBackButton();
+}
 
-  if (inTelegram) {
-    if (stack.length > 1) tg.BackButton.show();
-    else tg.BackButton.hide();
+function updateBackButton() {
+  if (!inTelegram) return;
+  if (stack.length > 1 || sheetResolve) tg.BackButton.show();
+  else tg.BackButton.hide();
+}
+
+// ---------- Окно ввода и подтверждение ----------
+
+const sheet = document.getElementById('sheet');
+const sheetInput = document.getElementById('sheet-input');
+let sheetResolve = null;
+let sheetMultiline = false;
+
+// Показывает окно ввода. Возвращает введённый текст или null при отмене
+function ask({ title, value = '', placeholder = '', max = 50, multiline = false }) {
+  document.getElementById('sheet-title').textContent = title;
+  sheetInput.value = value;
+  sheetInput.placeholder = placeholder;
+  sheetInput.maxLength = max;
+  sheetInput.rows = multiline ? 6 : 1;
+  sheetMultiline = multiline;
+  sheet.hidden = false;
+  sheetInput.focus();
+  return new Promise((resolve) => {
+    sheetResolve = resolve;
+    updateBackButton();
+  });
+}
+
+function closeSheet(result) {
+  sheet.hidden = true;
+  sheetInput.blur();
+  const resolve = sheetResolve;
+  sheetResolve = null;
+  updateBackButton();
+  if (resolve) resolve(result);
+}
+
+function saveSheet() {
+  const text = sheetInput.value.trim();
+  if (!text) {
+    toast('Пусто');
+    return;
   }
+  closeSheet(text);
+}
+
+document.getElementById('sheet-save').addEventListener('click', saveSheet);
+document.getElementById('sheet-cancel').addEventListener('click', () => closeSheet(null));
+// Нажатие на затемнённый фон — отмена
+sheet.addEventListener('click', (e) => { if (e.target === sheet) closeSheet(null); });
+// В однострочном поле Enter сохраняет
+sheetInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !sheetMultiline) {
+    e.preventDefault();
+    saveSheet();
+  }
+});
+
+function confirmDialog(text) {
+  return new Promise((resolve) => {
+    if (inTelegram && tg.isVersionAtLeast('6.2')) tg.showConfirm(text, resolve);
+    else resolve(window.confirm(text));
+  });
 }
 
 // ---------- Мелочи ----------
@@ -160,6 +304,11 @@ function toast(text) {
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+// Лёгкая вибрация при сохранении (только в Telegram)
+function haptic() {
+  if (inTelegram && tg.isVersionAtLeast('6.1')) tg.HapticFeedback.impactOccurred('light');
 }
 
 function applyTheme() {
