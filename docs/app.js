@@ -293,12 +293,38 @@ function moveSeg(seg, key) {
   buttons.forEach((b) => b.classList.toggle('active', b.dataset.key === key));
 }
 
-function ideaListHtml(sectionId, filter) {
-  const ideas = filteredIdeas(sectionId, filter);
-  if (!ideas.length) {
+// ---------- Страницы по 8 ----------
+
+const PAGE_SIZE = 8;
+
+// Кусок списка для текущей страницы. Если страница вышла за край (например, после удаления) — поправляет
+function paginate(list, route) {
+  const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  const page = Math.min(route.page || 0, pages - 1);
+  route.page = page;
+  return { items: list.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), page, pages };
+}
+
+// ‹  1 / 3  › — только если страниц больше одной
+function pagerHtml({ page, pages }) {
+  if (pages < 2) return '';
+  return `
+    <div class="pager">
+      <button class="pager-btn prev" data-act="set-page" data-dir="-1"${page === 0 ? ' disabled' : ''}>${CHEVRON}</button>
+      <span class="pager-info">${page + 1} / ${pages}</span>
+      <button class="pager-btn" data-act="set-page" data-dir="1"${page === pages - 1 ? ' disabled' : ''}>${CHEVRON}</button>
+    </div>`;
+}
+
+// Список планов раздела: текущий фильтр и страница берутся из route
+function ideaListHtml(route) {
+  const filter = route.filter || 'all';
+  const all = filteredIdeas(route.id, filter);
+  if (!all.length) {
     return `<p class="empty small">${filter === 'all' ? 'Планов пока нет' : 'Здесь пусто'}</p>`;
   }
-  const rows = ideas.map((idea, n) => `
+  const p = paginate(all, route);
+  const rows = p.items.map((idea, n) => `
     <div class="swipe${takeFlash(idea.id) ? ' appear' : ''}" style="--i:${n}">
       <button class="swipe-del" data-act="swipe-delete" data-kind="idea" data-id="${idea.id}">Удалить</button>
       <button class="row" data-act="open-idea" data-id="${idea.id}">
@@ -307,7 +333,35 @@ function ideaListHtml(sectionId, filter) {
         ${CHEVRON}
       </button>
     </div>`).join('');
-  return `<div class="group">${rows}</div>`;
+  return `<div class="page-items"><div class="group">${rows}</div></div>${pagerHtml(p)}`;
+}
+
+// «Выполненные»: все Done по порядку разделов, на странице группируются по разделам
+function archiveListHtml(route) {
+  const list = data.sections.flatMap((s) => filteredIdeas(s.id, 'done'));
+  if (!list.length) return '<p class="empty">Здесь появятся планы со статусом ⚫ Done</p>';
+  const p = paginate(list, route);
+
+  let html = '';
+  let section = null;
+  let rows = [];
+  const flush = () => {
+    if (!section) return;
+    const total = filteredIdeas(section.id, 'done').length;
+    html += `
+      <p class="group-head">${esc(section.name)} · ${total}</p>
+      <div class="group">${rows.join('')}</div>`;
+  };
+  p.items.forEach((idea, n) => {
+    if (!section || section.id !== idea.sec) {
+      flush();
+      section = findSection(idea.sec);
+      rows = [];
+    }
+    rows.push(doneRowHtml(idea, n));
+  });
+  flush();
+  return `<div class="page-items">${html}</div>${pagerHtml(p)}`;
 }
 
 // Строка выполненного плана в «Выполненных»: ⚫, заголовок, дата выполнения
@@ -364,7 +418,7 @@ views.section = (route) => {
       <button class="btn primary" data-act="add-idea" data-id="${s.id}">➕ Новый план</button>
     </div>
     ${segHtml(FILTERS, filter, 'set-filter')}
-    <div class="ideas">${ideaListHtml(s.id, filter)}</div>
+    <div class="paged">${ideaListHtml(route)}</div>
     <div class="group">
       <button class="row" data-act="rename-section" data-id="${s.id}">Переименовать</button>
       <button class="row danger" data-act="delete-section" data-id="${s.id}">Удалить раздел</button>
@@ -404,21 +458,12 @@ const TITLE_MAX = 80;
 const IDEA_MAX = 3000; // в облаке Telegram на одну запись — до 4096 символов
 
 // «Выполненные»: все Done, сгруппированные по разделам (в порядке разделов), свежие сверху
-views.archive = () => {
-  let total = 0;
-  const blocks = data.sections.map((s) => {
-    const ideas = filteredIdeas(s.id, 'done');
-    if (!ideas.length) return '';
-    total += ideas.length;
-    return `
-      <p class="group-head">${esc(s.name)} · ${ideas.length}</p>
-      <div class="group">${ideas.map(doneRowHtml).join('')}</div>`;
-  }).join('');
-
+views.archive = (route) => {
+  const total = data.ideas.filter((i) => i.st === 'done').length;
   return `
     <h1>Выполненные</h1>
     <p class="sub">${total ? plural(total, ['план', 'плана', 'планов']) : 'Пока ничего не выполнено'}</p>
-    ${blocks || '<p class="empty">Здесь появятся планы со статусом ⚫ Done</p>'}`;
+    <div class="paged">${archiveListHtml(route)}</div>`;
 };
 
 // Поля окна для идеи: заголовок и необязательное описание
@@ -483,9 +528,11 @@ const actions = {
     const [title, text] = res;
     const idea = { id: newId(), sec: id, title, text, st: 'new', at: Date.now() };
     flash = idea.id;
-    // Новый план — Not started. Если открыт фильтр, где его не видно, переключаемся на «Все»
+    // Новый план — Not started, он первый в списке. Если открыт фильтр, где его не видно,
+    // переключаемся на «Все»; в любом случае — на первую страницу
     const route = stack[stack.length - 1];
     if (route.filter === 'wip' || route.filter === 'done') route.filter = 'all';
+    route.page = 0;
     await commit(() => {
       data.ideas.push(idea);
       return saveIdea(idea);
@@ -499,13 +546,25 @@ const actions = {
     const route = stack[stack.length - 1];
     if ((route.filter || 'all') === key) return;
     route.filter = key;
+    route.page = 0;
     closeSwipe(false);
     moveSeg(el.closest('.seg'), key);
-    const box = el.closest('.screen-inner').querySelector('.ideas');
-    box.innerHTML = ideaListHtml(route.id, key);
-    box.classList.remove('list-swap');
-    void box.offsetWidth; // перезапуск анимации
-    box.classList.add('list-swap');
+    const box = el.closest('.screen-inner').querySelector('.paged');
+    box.innerHTML = ideaListHtml(route);
+    restartAnim(box, 'list-swap');
+  },
+
+  // Листание страниц: новая страница въезжает справа (вперёд) или слева (назад)
+  'set-page': ({ dir }, el) => {
+    const route = stack[stack.length - 1];
+    route.page = (route.page || 0) + Number(dir);
+    closeSwipe(false);
+    const box = el.closest('.paged');
+    box.innerHTML = route.name === 'archive' ? archiveListHtml(route) : ideaListHtml(route);
+    restartAnim(box, Number(dir) > 0 ? 'page-next' : 'page-prev');
+    softHaptic();
+    // Если начало списка ушло вверх за экран — плавно поднимаемся к нему
+    if (box.getBoundingClientRect().top < 0) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
   },
 
   // Статус в карточке: сохраняем сразу, экран не перерисовываем, чтобы таблетка плавно переехала
@@ -655,6 +714,13 @@ function endDrag() {
 
 document.addEventListener('pointerup', endDrag);
 document.addEventListener('pointercancel', endDrag);
+
+// Перезапускает анимацию появления блока (класс cls)
+function restartAnim(el, cls) {
+  el.classList.remove('list-swap', 'page-next', 'page-prev');
+  void el.offsetWidth; // без этого анимация с тем же классом не повторится
+  el.classList.add(cls);
+}
 
 // Плавно схлопывает строку списка
 function collapse(el) {

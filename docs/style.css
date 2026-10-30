@@ -121,8 +121,27 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .seg.big .ic { font-size: 18px; line-height: 1.2; }
 
 /* Список после смены фильтра мягко проявляется */
-.ideas.list-swap { animation: in-fade .35s ease; }
-.ideas.list-swap .swipe { animation: row-in .45s var(--ease) both; animation-delay: calc(var(--i, 0) * 35ms); }
+.paged.list-swap { animation: in-fade .35s ease; }
+.paged.list-swap .swipe { animation: row-in .45s var(--ease) both; animation-delay: calc(var(--i, 0) * 35ms); }
+
+/* ---------- Страницы ---------- */
+.pager { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 14px; }
+.pager-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--cell); color: var(--fg);
+  transition: transform .25s var(--soft), opacity .25s ease;
+}
+.pager-btn:active { transform: scale(0.9); transition-duration: .1s; }
+.pager-btn:disabled { opacity: 0.35; cursor: default; transform: none; }
+.pager-btn.prev .chev { transform: rotate(180deg); }
+.pager-info { min-width: 56px; color: var(--muted); font-size: 15px; text-align: center; font-variant-numeric: tabular-nums; }
+
+/* Новая страница въезжает справа (вперёд) или слева (назад) */
+@keyframes page-next { from { opacity: 0; transform: translateX(32px); } }
+@keyframes page-prev { from { opacity: 0; transform: translateX(-32px); } }
+.paged.page-next .page-items { animation: page-next .45s var(--soft) both; }
+.paged.page-prev .page-items { animation: page-prev .45s var(--soft) both; }
 
 /* ---------- Карточка идеи ---------- */
 .card { margin-top: 14px; padding: 18px 20px; border-radius: 20px; background: var(--cell); }
