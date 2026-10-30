@@ -8,6 +8,8 @@ const inTelegram = Boolean(tg && tg.initData);
 if (inTelegram) {
   tg.ready();
   tg.expand();
+  // Чтобы прокрутка списка вниз не сворачивала приложение
+  if (tg.isVersionAtLeast('7.7')) tg.disableVerticalSwipes();
 }
 
 // ---------- Хранилище ----------
@@ -85,8 +87,8 @@ function saveSections() {
 }
 
 // Выполняет изменение и сохранение. При ошибке перечитывает данные, чтобы экран не врал.
-// direction — анимация перехода после сохранения (если экран меняется)
-async function commit(change, direction) {
+// after — что сделать потом: по умолчанию обновить текущий экран
+async function commit(change, after = refresh) {
   try {
     await change();
     haptic();
@@ -95,26 +97,88 @@ async function commit(change, direction) {
     toast('Не удалось сохранить');
     await loadData().catch(() => {});
   }
-  render(direction);
+  await after();
 }
 
 // ---------- Навигация ----------
-// Стек экранов: последний — текущий. «Назад» убирает верхний.
+// stack — маршруты экранов, screens — их слои на странице (по одному на маршрут).
+// Новый экран выезжает справа поверх текущего, «Назад» уводит его обратно вправо.
 
+const app = document.getElementById('app');
 const stack = [{ name: 'main' }];
+const screens = [];
+let busy = false; // идёт переход — нажатия игнорируем
 
-function go(route) {
-  stack.push(route);
-  render('forward');
+const SLIDE_MS = 500;
+const SLIDE_EASE = 'cubic-bezier(.32, .72, 0, 1)';
+const UNDER_SHIFT = 'translateX(-28%)'; // насколько нижний экран уходит влево
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Запускает анимацию слоя; null — если анимации выключены
+function motion(el, frames) {
+  if (reduceMotion || !el.animate) return null;
+  return el.animate(frames, { duration: SLIDE_MS, easing: SLIDE_EASE, fill: 'forwards' });
 }
 
-function back() {
+async function finishAll(anims) {
+  const list = anims.filter(Boolean);
+  await Promise.all(list.map((a) => a.finished));
+  return list;
+}
+
+function makeShade() {
+  const el = document.createElement('div');
+  el.className = 'shade';
+  return el;
+}
+
+async function go(route) {
+  if (busy) return;
+  busy = true;
+  stack.push(route);
+  const under = screens[screens.length - 1];
+  const top = makeScreen(stack.length - 1);
+  const shade = makeShade();
+  screens.push(top);
+  app.append(shade, top);
+  updateBackButton();
+
+  const anims = await finishAll([
+    motion(top, [{ transform: 'translateX(100%)' }, { transform: 'translateX(0)' }]),
+    motion(under, [{ transform: 'translateX(0)' }, { transform: UNDER_SHIFT }]),
+    motion(shade, [{ opacity: 0 }, { opacity: 1 }]),
+  ]);
+  under.classList.add('covered'); // нижний слой не виден — прячем (прокрутка сохраняется)
+  shade.remove();
+  anims.forEach((a) => a.cancel());
+  busy = false;
+}
+
+async function back() {
   if (sheetResolve) {
     closeSheet(null);
-  } else if (stack.length > 1) {
-    stack.pop();
-    render('back');
+    return;
   }
+  if (busy || stack.length < 2) return;
+  busy = true;
+  stack.pop();
+  const top = screens.pop();
+  const under = screens[screens.length - 1];
+  refreshScreen(under, stack.length - 1); // данные могли измениться, пока он был закрыт
+  under.classList.remove('covered');
+  const shade = makeShade();
+  top.before(shade);
+  updateBackButton();
+
+  const anims = await finishAll([
+    motion(top, [{ transform: 'translateX(0)' }, { transform: 'translateX(100%)' }]),
+    motion(under, [{ transform: UNDER_SHIFT }, { transform: 'translateX(0)' }]),
+    motion(shade, [{ opacity: 1 }, { opacity: 0 }]),
+  ]);
+  top.remove();
+  shade.remove();
+  anims.forEach((a) => a.cancel());
+  busy = false;
 }
 
 // ---------- Экраны ----------
@@ -188,14 +252,13 @@ const actions = {
     const extra = ideas.length ? `\nВместе с ним удалятся идеи: ${ideas.length}.` : '';
     if (!(await confirmDialog(`Удалить раздел «${s.name}»?${extra}`))) return;
 
-    stack.pop(); // после удаления возвращаемся на главный экран
     await commit(async () => {
       // Сначала идеи, потом сам раздел
       for (const idea of ideas) await store.remove('i_' + idea.id);
       data.ideas = data.ideas.filter((i) => i.sec !== id);
       data.sections = data.sections.filter((x) => x.id !== id);
       await saveSections();
-    }, 'back');
+    }, back); // после удаления возвращаемся на главный экран
   },
 
   // Заглушки: появятся на следующих этапах
@@ -205,30 +268,38 @@ const actions = {
 
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-act]');
-  if (!el) return;
+  if (!el || busy) return;
   const action = actions[el.dataset.act];
   if (action) action(el.dataset, el);
 });
 
 // ---------- Отрисовка ----------
 
-const app = document.getElementById('app');
-
-// direction: 'forward' / 'back' / 'fade' — анимация появления; без него экран просто обновляется
-function render(direction) {
-  const route = stack[stack.length - 1];
+function screenHtml(index) {
+  const route = stack[index];
   // Вне Telegram показываем свою кнопку «Назад», в Telegram — встроенную
-  const backLink = !inTelegram && stack.length > 1
+  const backLink = !inTelegram && index > 0
     ? '<button class="back" data-act="back">← Назад</button>' : '';
-  app.innerHTML = backLink + views[route.name](route);
+  return `<div class="screen-inner">${backLink}${views[route.name](route)}</div>`;
+}
 
-  app.classList.remove('anim-forward', 'anim-back', 'anim-fade');
-  if (direction) {
-    void app.offsetWidth; // перезапуск анимации, даже если класс тот же
-    app.classList.add('anim-' + direction);
-    window.scrollTo(0, 0);
-  }
-  updateBackButton();
+function makeScreen(index) {
+  const el = document.createElement('section');
+  el.className = 'screen';
+  el.innerHTML = screenHtml(index);
+  return el;
+}
+
+// Перерисовывает слой, не сбрасывая прокрутку
+function refreshScreen(el, index) {
+  const y = el.scrollTop;
+  el.innerHTML = screenHtml(index);
+  el.scrollTop = y;
+}
+
+// Обновляет текущий (верхний) экран после изменений
+function refresh() {
+  refreshScreen(screens[screens.length - 1], stack.length - 1);
 }
 
 function updateBackButton() {
@@ -343,7 +414,13 @@ async function start() {
   }
   try {
     await loadData();
-    render('fade');
+    // Первый экран: плавно проявляется, строки появляются по очереди
+    const first = makeScreen(0);
+    first.classList.add('intro');
+    screens.push(first);
+    app.replaceChildren(first);
+    setTimeout(() => first.classList.remove('intro'), 1500);
+    updateBackButton();
   } catch (err) {
     app.innerHTML = `<p class="empty">Не удалось загрузить данные.<br>${esc(err.message)}</p>`;
   }

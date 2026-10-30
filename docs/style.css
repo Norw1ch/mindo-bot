@@ -20,14 +20,28 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
+html, body { height: 100%; }
 body {
-  overflow-x: hidden; /* чтобы сдвиг при анимации не давал горизонтальную прокрутку */
+  overflow: hidden; /* прокручиваются сами экраны, а не страница */
   background: var(--bg);
   color: var(--fg);
   font: 16px/1.4 -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
 }
 
-#app { max-width: 560px; margin: 0 auto; padding: 20px 16px 40px; }
+/* Экраны — слои друг над другом, каждый со своей прокруткой */
+#app { position: fixed; inset: 0; overflow: hidden; }
+.screen {
+  position: absolute; inset: 0;
+  overflow-y: auto; overscroll-behavior: contain;
+  background: var(--bg);
+}
+.screen ~ .screen { box-shadow: -12px 0 32px rgba(0, 0, 0, 0.14); } /* тень от верхнего слоя */
+.screen.covered { visibility: hidden; }
+.screen-inner { max-width: 560px; margin: 0 auto; padding: 20px 16px 40px; }
+
+/* Затемнение нижнего экрана во время перехода */
+.shade { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.16); pointer-events: none; }
+[data-theme="dark"] .shade { background: rgba(0, 0, 0, 0.5); }
 
 /* Заголовок экрана */
 h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; word-break: break-word; }
@@ -54,7 +68,7 @@ h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; word-break: bre
   border: 1px solid var(--fg); border-radius: 10px;
   background: none; color: var(--fg); font: inherit; cursor: pointer;
 }
-.btn { transition: transform .12s ease, opacity .12s ease; }
+.btn { transition: transform .18s ease, opacity .18s ease; }
 .btn:active { opacity: 0.7; transform: scale(0.98); }
 .btn.primary { background: var(--inv-bg); border-color: var(--inv-bg); color: var(--inv-fg); }
 .btn.quiet { border-color: var(--line); color: var(--muted); }
@@ -70,13 +84,13 @@ h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; word-break: bre
   display: flex; align-items: flex-start; justify-content: center;
   padding: 12vh 16px 0; background: rgba(0, 0, 0, 0.45);
   opacity: 0; visibility: hidden;
-  transition: opacity .22s ease, visibility 0s linear .22s;
+  transition: opacity .32s ease, visibility 0s linear .32s;
 }
-.sheet.open { opacity: 1; visibility: visible; transition: opacity .22s ease; }
+.sheet.open { opacity: 1; visibility: visible; transition: opacity .32s ease; }
 .sheet-box {
   width: 100%; max-width: 528px; padding: 18px 16px 16px; border-radius: 14px; background: var(--bg);
-  transform: translateY(-14px) scale(0.98);
-  transition: transform .28s var(--ease);
+  transform: translateY(-18px) scale(0.98);
+  transition: transform .42s var(--ease);
 }
 .sheet.open .sheet-box { transform: none; }
 .sheet-title { margin-bottom: 12px; font-weight: 600; }
@@ -91,30 +105,25 @@ h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; word-break: bre
 
 /* Всплывающая подсказка */
 .toast {
-  position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
+  position: fixed; z-index: 20; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
   padding: 10px 16px; border-radius: 10px;
   background: var(--inv-bg); color: var(--inv-fg); font-size: 14px;
-  opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+  opacity: 0; pointer-events: none; transition: opacity .3s, transform .3s;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 /* ---------- Анимации ---------- */
 :root { --ease: cubic-bezier(.2, .8, .2, 1); }
 
-@keyframes in-forward { from { opacity: 0; transform: translateX(28px); } }
-@keyframes in-back    { from { opacity: 0; transform: translateX(-28px); } }
-@keyframes in-fade    { from { opacity: 0; } }
-@keyframes row-in     { from { opacity: 0; transform: translateY(6px); } }
+@keyframes in-fade { from { opacity: 0; } }
+@keyframes row-in  { from { opacity: 0; transform: translateY(8px); } }
 
-/* Появление экрана: вперёд — справа, назад — слева, при запуске — проявление */
-#app.anim-forward { animation: in-forward .3s var(--ease); }
-#app.anim-back    { animation: in-back .3s var(--ease); }
-#app.anim-fade    { animation: in-fade .35s ease; }
-
-/* Строки списка появляются по очереди (--i — номер строки) */
-#app[class*="anim-"] .row {
-  animation: row-in .32s var(--ease) both;
-  animation-delay: calc(var(--i, 0) * 25ms + 40ms);
+/* Запуск приложения: экран проявляется, строки появляются по очереди (--i — номер строки).
+   Переходы между экранами делает app.js */
+.screen.intro { animation: in-fade .5s ease; }
+.screen.intro .row {
+  animation: row-in .5s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 45ms + 80ms);
 }
 
 /* Если в системе включено «уменьшить движение» — без анимаций */
