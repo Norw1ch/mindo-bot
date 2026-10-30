@@ -662,6 +662,41 @@ function endDrag() {
 document.addEventListener('pointerup', endDrag);
 document.addEventListener('pointercancel', endDrag);
 
+// ---------- Панель вкладок прячется, пока открыта клавиатура ----------
+// Иначе при появлении клавиатуры Telegram уменьшает экран, и панель прыгает на край клавиатуры.
+// Причины спрятать: 'sheet' — открыто окно ввода, 'typing' — курсор в каком-то поле.
+// Показываем обратно с задержкой — когда клавиатура уже уехала
+
+const tabbarHiders = new Set();
+const TABBAR_BACK_DELAY = 400;
+let tabbarTimer;
+
+function hideTabbar(reason) {
+  clearTimeout(tabbarTimer);
+  tabbarHiders.add(reason);
+  document.body.classList.add('no-tabbar');
+}
+
+function releaseTabbar(reason) {
+  tabbarHiders.delete(reason);
+  clearTimeout(tabbarTimer);
+  tabbarTimer = setTimeout(() => {
+    if (!tabbarHiders.size) document.body.classList.remove('no-tabbar');
+  }, TABBAR_BACK_DELAY);
+}
+
+// Поле, при котором появляется клавиатура (а не выбор файла или даты)
+function opensKeyboard(el) {
+  return Boolean(el && el.matches && el.matches('textarea, input:not([type="file"]):not([type="date"])'));
+}
+
+document.addEventListener('focusin', (e) => {
+  if (opensKeyboard(e.target)) hideTabbar('typing');
+});
+document.addEventListener('focusout', (e) => {
+  if (opensKeyboard(e.target)) releaseTabbar('typing');
+});
+
 // ---------- Окно ввода ----------
 
 const sheet = document.getElementById('sheet');
@@ -693,6 +728,9 @@ function ask({ title, fields }) {
     return el;
   });
   sheetFields.replaceChildren(...sheetInputs);
+  hideTabbar('sheet');
+  // Отступ сверху фиксируем сейчас: когда выедет клавиатура, экран станет ниже, а окно не должно сдвигаться
+  sheet.style.paddingTop = `${Math.round(window.innerHeight * 0.12)}px`;
   sheet.classList.remove('closing');
   sheet.classList.add('open');
   sheetInputs.forEach((el) => { if (!el.dataset.multiline) autoGrow(el); });
@@ -723,6 +761,7 @@ function onSheetKey(e) {
 function closeSheet(result) {
   sheet.classList.add('closing'); // окно плавно уменьшается и исчезает
   sheetInputs.forEach((el) => el.blur());
+  releaseTabbar('sheet');
   sheetTimer = setTimeout(() => sheet.classList.remove('open', 'closing'), 260);
   const resolve = sheetResolve;
   sheetResolve = null;
