@@ -84,8 +84,9 @@ function saveSections() {
   return store.set('sections', JSON.stringify(data.sections));
 }
 
-// Выполняет изменение и сохранение. При ошибке перечитывает данные, чтобы экран не врал
-async function commit(change) {
+// Выполняет изменение и сохранение. При ошибке перечитывает данные, чтобы экран не врал.
+// direction — анимация перехода после сохранения (если экран меняется)
+async function commit(change, direction) {
   try {
     await change();
     haptic();
@@ -94,7 +95,7 @@ async function commit(change) {
     toast('Не удалось сохранить');
     await loadData().catch(() => {});
   }
-  render();
+  render(direction);
 }
 
 // ---------- Навигация ----------
@@ -104,7 +105,7 @@ const stack = [{ name: 'main' }];
 
 function go(route) {
   stack.push(route);
-  render();
+  render('forward');
 }
 
 function back() {
@@ -112,7 +113,7 @@ function back() {
     closeSheet(null);
   } else if (stack.length > 1) {
     stack.pop();
-    render();
+    render('back');
   }
 }
 
@@ -121,8 +122,8 @@ function back() {
 const views = {};
 
 views.main = () => {
-  const rows = data.sections.map((s) => `
-    <button class="row" data-act="open-section" data-id="${s.id}">
+  const rows = data.sections.map((s, n) => `
+    <button class="row" style="--i:${n}" data-act="open-section" data-id="${s.id}">
       <span class="title">${esc(s.name)}</span>
       <span class="meta">${activeCount(s.id)}</span>
     </button>`).join('');
@@ -194,7 +195,7 @@ const actions = {
       data.ideas = data.ideas.filter((i) => i.sec !== id);
       data.sections = data.sections.filter((x) => x.id !== id);
       await saveSections();
-    });
+    }, 'back');
   },
 
   // Заглушки: появятся на следующих этапах
@@ -213,13 +214,20 @@ document.addEventListener('click', (e) => {
 
 const app = document.getElementById('app');
 
-function render() {
+// direction: 'forward' / 'back' / 'fade' — анимация появления; без него экран просто обновляется
+function render(direction) {
   const route = stack[stack.length - 1];
   // Вне Telegram показываем свою кнопку «Назад», в Telegram — встроенную
   const backLink = !inTelegram && stack.length > 1
     ? '<button class="back" data-act="back">← Назад</button>' : '';
   app.innerHTML = backLink + views[route.name](route);
-  window.scrollTo(0, 0);
+
+  app.classList.remove('anim-forward', 'anim-back', 'anim-fade');
+  if (direction) {
+    void app.offsetWidth; // перезапуск анимации, даже если класс тот же
+    app.classList.add('anim-' + direction);
+    window.scrollTo(0, 0);
+  }
   updateBackButton();
 }
 
@@ -244,7 +252,7 @@ function ask({ title, value = '', placeholder = '', max = 50, multiline = false 
   sheetInput.maxLength = max;
   sheetInput.rows = multiline ? 6 : 1;
   sheetMultiline = multiline;
-  sheet.hidden = false;
+  sheet.classList.add('open');
   sheetInput.focus();
   return new Promise((resolve) => {
     sheetResolve = resolve;
@@ -253,7 +261,7 @@ function ask({ title, value = '', placeholder = '', max = 50, multiline = false 
 }
 
 function closeSheet(result) {
-  sheet.hidden = true;
+  sheet.classList.remove('open');
   sheetInput.blur();
   const resolve = sheetResolve;
   sheetResolve = null;
@@ -335,7 +343,7 @@ async function start() {
   }
   try {
     await loadData();
-    render();
+    render('fade');
   } catch (err) {
     app.innerHTML = `<p class="empty">Не удалось загрузить данные.<br>${esc(err.message)}</p>`;
   }
