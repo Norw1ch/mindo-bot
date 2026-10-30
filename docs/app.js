@@ -327,12 +327,15 @@ let suppressClick = false;
 function setSwipe(wrap, x, animate) {
   const row = wrap.querySelector('.row');
   const del = wrap.querySelector('.swipe-del');
-  const p = Math.min(1, -x / SWIPE_OPEN);
+  // p — насколько открыта кнопка (0…1). Кнопка начинает проявляться после 15% сдвига,
+  // а s сглаживает разгон и торможение
+  const p = Math.min(1, Math.max(0, (-x / SWIPE_OPEN - 0.15) / 0.85));
+  const s = p * p * (3 - 2 * p);
   row.classList.toggle('settling', animate);
   del.classList.toggle('settling', animate);
   row.style.transform = x ? `translateX(${x}px)` : '';
-  del.style.opacity = p;
-  del.style.transform = `scale(${0.6 + 0.4 * p})`;
+  del.style.opacity = s;
+  del.style.transform = `translateX(${(1 - s) * 24}px) scale(${0.85 + 0.15 * s})`;
 }
 
 function closeSwipe(animate = true) {
@@ -365,6 +368,7 @@ document.addEventListener('pointermove', (e) => {
       return;
     }
     drag.active = true;
+    drag.wrap.querySelector('.row').classList.add('dragging');
     pendingClose = false;
     if (openSwipe && openSwipe !== drag.wrap) closeSwipe();
     try { drag.wrap.setPointerCapture(e.pointerId); } catch { /* не страшно */ }
@@ -379,9 +383,10 @@ document.addEventListener('pointermove', (e) => {
 function endDrag() {
   if (drag && drag.active) {
     suppressClick = true;
+    drag.wrap.querySelector('.row').classList.remove('dragging');
     const open = drag.x < -SWIPE_OPEN / 2;
     setSwipe(drag.wrap, open ? -SWIPE_OPEN : 0, true);
-    if (open && openSwipe !== drag.wrap) haptic();
+    if (open && openSwipe !== drag.wrap) softHaptic();
     openSwipe = open ? drag.wrap : null;
   } else if (pendingClose) {
     closeSwipe();
@@ -526,6 +531,11 @@ function toast(text) {
 // Лёгкая вибрация (только в Telegram)
 function haptic() {
   if (inTelegram && tg.isVersionAtLeast('6.1')) tg.HapticFeedback.impactOccurred('light');
+}
+
+// Самая мягкая вибрация — когда открывается кнопка свайпа
+function softHaptic() {
+  if (inTelegram && tg.isVersionAtLeast('6.1')) tg.HapticFeedback.selectionChanged();
 }
 
 function applyTheme() {
