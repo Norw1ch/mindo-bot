@@ -121,7 +121,7 @@ async function deleteIdeaData(id) {
 }
 
 function confirmDeleteIdea(id) {
-  return confirmDialog(`Удалить идею «${shorten(findIdea(id).title, 40)}»?`);
+  return confirmDialog(`Удалить план «${shorten(findIdea(id).title, 40)}»?`);
 }
 
 // Удаляет раздел вместе с его идеями: сначала идеи, потом сам раздел
@@ -135,7 +135,7 @@ async function deleteSectionData(id) {
 function confirmDeleteSection(id) {
   const s = findSection(id);
   const count = data.ideas.filter((i) => i.sec === id).length;
-  const extra = count ? `\nВместе с ним удалятся идеи: ${count}.` : '';
+  const extra = count ? `\nВместе с ним удалятся планы: ${count}.` : '';
   return confirmDialog(`Удалить раздел «${s.name}»?${extra}`);
 }
 
@@ -271,12 +271,12 @@ views.main = () => {
     </div>`).join('');
 
   return `
-    <h1>Журнал идей</h1>
+    <h1>Мои планы</h1>
     <p class="sub">${data.sections.length ? 'Выбери раздел' : 'Разделов пока нет'}</p>
     ${rows ? `<div class="group">${rows}</div>` : ''}
     <div class="actions">
       <button class="btn primary" data-act="new-section">➕ Новый раздел</button>
-      <button class="btn" data-act="open-archive">🗄 Архив Done</button>
+      <button class="btn" data-act="open-archive">🗄 Выполненные</button>
     </div>`;
 };
 
@@ -297,9 +297,9 @@ views.section = (route) => {
 
   return `
     <h1${takeFlash(s.id) ? ' class="swap"' : ''}>${esc(s.name)}</h1>
-    <p class="sub">${ideas.length ? plural(ideas.length, ['идея', 'идеи', 'идей']) : 'Идей пока нет'}</p>
+    <p class="sub">${ideas.length ? plural(ideas.length, ['план', 'плана', 'планов']) : 'Планов пока нет'}</p>
     <div class="actions">
-      <button class="btn primary" data-act="add-idea" data-id="${s.id}">➕ Добавить идею</button>
+      <button class="btn primary" data-act="add-idea" data-id="${s.id}">➕ Новый план</button>
     </div>
     ${rows ? `<div class="group">${rows}</div>` : ''}
     <div class="group">
@@ -310,7 +310,7 @@ views.section = (route) => {
 
 views.idea = (route) => {
   const idea = findIdea(route.id);
-  if (!idea) return '<p class="empty">Идея не найдена</p>';
+  if (!idea) return '<p class="empty">План не найден</p>';
   const section = findSection(idea.sec);
   const st = STATUS[idea.st];
   const swap = takeFlash(idea.id) ? ' swap' : '';
@@ -324,11 +324,11 @@ views.idea = (route) => {
     <div class="card${swap}">
       <p class="status">${st.icon} ${st.label}</p>
       ${text}
-      <p class="date">Создана ${formatDate(idea.at)}</p>
+      <p class="date">Создан ${formatDate(idea.at)}</p>
     </div>
     <div class="group">
       <button class="row" data-act="edit-idea" data-id="${idea.id}">Изменить</button>
-      <button class="row danger" data-act="delete-idea" data-id="${idea.id}">Удалить идею</button>
+      <button class="row danger" data-act="delete-idea" data-id="${idea.id}">Удалить план</button>
     </div>`;
 };
 
@@ -395,7 +395,7 @@ const actions = {
   },
 
   'add-idea': async ({ id }) => {
-    const res = await ask({ title: 'Новая идея', fields: ideaFields() });
+    const res = await ask({ title: 'Новый план', fields: ideaFields() });
     if (!res) return;
     const [title, text] = res;
     const idea = { id: newId(), sec: id, title, text, st: 'new', at: Date.now() };
@@ -410,7 +410,7 @@ const actions = {
 
   'edit-idea': async ({ id }) => {
     const idea = findIdea(id);
-    const res = await ask({ title: 'Изменить идею', fields: ideaFields(idea) });
+    const res = await ask({ title: 'Изменить план', fields: ideaFields(idea) });
     if (!res) return;
     const [title, text] = res;
     if (title === idea.title && text === idea.text) return;
