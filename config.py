@@ -10,6 +10,8 @@ load_dotenv(BASE_DIR / ".env")
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 OWNER_ID_RAW = os.getenv("OWNER_ID", "").strip()
+# Адрес Mini App (https://...). Пока пустой — бот подскажет, что его нужно заполнить
+WEBAPP_URL = os.getenv("WEBAPP_URL", "").strip()
 
 if not BOT_TOKEN or "ваш-токен" in BOT_TOKEN or not OWNER_ID_RAW.isdigit():
     raise SystemExit(
@@ -18,4 +20,3 @@ if not BOT_TOKEN or "ваш-токен" in BOT_TOKEN or not OWNER_ID_RAW.isdigit
     )
 
 OWNER_ID = int(OWNER_ID_RAW)
-DB_PATH = BASE_DIR / "ideas.db"

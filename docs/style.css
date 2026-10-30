@@ -1,0 +1,67 @@
+/* Монохромные цвета: светлая и тёмная тема */
+:root {
+  --bg: #ffffff;
+  --fg: #111111;
+  --muted: #8c8c8c;
+  --line: #e8e8e8;
+  --soft: #f4f4f4;
+  --inv-bg: #111111;
+  --inv-fg: #ffffff;
+}
+[data-theme="dark"] {
+  --bg: #0f0f0f;
+  --fg: #f0f0f0;
+  --muted: #7c7c7c;
+  --line: #242424;
+  --soft: #1a1a1a;
+  --inv-bg: #f0f0f0;
+  --inv-fg: #0f0f0f;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.4 -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+}
+
+#app { max-width: 560px; margin: 0 auto; padding: 20px 16px 40px; }
+
+/* Заголовок экрана */
+h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; word-break: break-word; }
+.sub { margin-top: 4px; color: var(--muted); font-size: 14px; }
+.back { margin-bottom: 14px; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 15px; cursor: pointer; }
+
+/* Списки */
+.list { margin-top: 20px; border-top: 1px solid var(--line); }
+.row {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 14px 2px;
+  border: 0; border-bottom: 1px solid var(--line);
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.row:active { opacity: 0.5; }
+.row .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .meta { color: var(--muted); font-size: 14px; }
+.empty { padding: 32px 0; color: var(--muted); text-align: center; }
+
+/* Кнопки */
+.actions { margin-top: 24px; }
+.btn {
+  display: block; width: 100%; margin-top: 10px; padding: 13px;
+  border: 1px solid var(--fg); border-radius: 10px;
+  background: none; color: var(--fg); font: inherit; cursor: pointer;
+}
+.btn:active { opacity: 0.6; }
+.btn.primary { background: var(--inv-bg); border-color: var(--inv-bg); color: var(--inv-fg); }
+.btn.quiet { border-color: var(--line); color: var(--muted); }
+
+/* Всплывающая подсказка */
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
+  padding: 10px 16px; border-radius: 10px;
+  background: var(--inv-bg); color: var(--inv-fg); font-size: 14px;
+  opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
