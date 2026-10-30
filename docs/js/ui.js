@@ -12,6 +12,9 @@ const CHEVRON = '<svg class="chev" width="8" height="13" viewBox="0 0 8 13" aria
   + '<path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2"'
   + ' stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
+// Кружок для отметки (чеклист в плане, пункты списков); галочка «рисуется» при отметке
+const CHECK = '<span class="check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.5 12.5 3.5 3.5 7.5-8"/></svg></span>';
+
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // Что мягко подсветить при следующей отрисовке (новая строка, новое имя).
@@ -402,9 +405,14 @@ document.addEventListener('input', (e) => {
   clearTimeout(editTimers.get(el));
   editTimers.set(el, setTimeout(() => flushEdit(el, false), EDIT_DELAY));
 });
+// Поля, при которых показываем «Готово»: правка на месте и быстрое добавление пунктов
+function isTyping(el) {
+  return Boolean(el && el.classList && (el.classList.contains('inline-edit') || el.classList.contains('quick-add')));
+}
+
 document.addEventListener('focusout', (e) => {
-  if (!e.target.classList.contains('inline-edit')) return;
-  flushEdit(e.target, true);
+  if (!isTyping(e.target)) return;
+  if (e.target.classList.contains('inline-edit')) flushEdit(e.target, true);
   // Прячем «Готово» с задержкой: если фокус перешёл в соседнее поле, кнопка останется
   doneTimer = setTimeout(() => doneBtn.classList.remove('show'), 150);
 });
@@ -424,7 +432,7 @@ if (window.visualViewport) {
 }
 
 document.addEventListener('focusin', (e) => {
-  if (!e.target.classList.contains('inline-edit')) return;
+  if (!isTyping(e.target)) return;
   clearTimeout(doneTimer);
   placeDoneBtn();
   doneBtn.classList.add('show');
@@ -433,9 +441,11 @@ document.addEventListener('focusin', (e) => {
 doneBtn.addEventListener('pointerdown', (e) => e.preventDefault());
 doneBtn.addEventListener('click', () => {
   const el = document.activeElement;
-  if (el && el.classList.contains('inline-edit')) el.blur(); // уход с поля сохраняет текст
+  if (!isTyping(el)) return;
+  const editing = el.classList.contains('inline-edit');
+  el.blur(); // уход с поля сохраняет текст
   softHaptic();
-  toast('Сохранено');
+  if (editing) toast('Сохранено');
 });
 // Enter в однострочном поле (заголовке) убирает клавиатуру
 document.addEventListener('keydown', (e) => {

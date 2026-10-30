@@ -27,7 +27,7 @@ const TABS = [
     icon: icon('<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M6.5 6V5.5A2.5 2.5 0 0 1 9 3h8.5M3 10.5h18M16 15h2"/>'),
   },
   {
-    key: 'lists', label: 'Списки', root: { name: 'soon', title: 'Списки' },
+    key: 'lists', label: 'Списки', root: { name: 'lists' },
     icon: icon('<path d="M9.5 6.5h10M9.5 12h10M9.5 17.5h10"/><circle cx="5" cy="6.5" r="1.1"/><circle cx="5" cy="12" r="1.1"/><circle cx="5" cy="17.5" r="1.1"/>'),
   },
 ];

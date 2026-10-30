@@ -200,8 +200,6 @@ function itemsMeta(idea) {
   return total ? `<span class="meta small">${done}/${total}</span>` : '';
 }
 
-const CHECK = '<span class="check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.5 12.5 3.5 3.5 7.5-8"/></svg></span>';
-
 // Заголовок чеклиста: «Чеклист · 2 из 5» и полоска прогресса
 function checklistHead(idea) {
   const { done, total } = itemsProgress(idea);

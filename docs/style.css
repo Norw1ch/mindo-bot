@@ -240,6 +240,21 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 
 @keyframes check-pop { 50% { transform: scale(1.18); } }
 
+/* ---------- Списки ---------- */
+.group:empty { display: none; }
+.quick { margin-top: 18px; }
+.quick + .todo-group { margin-top: 12px; }
+.quick-row, .quick-row:active { cursor: text; background: var(--cell); }
+.quick-row .plus {
+  flex: none; width: 24px; text-align: center;
+  color: var(--muted); font-size: 22px; line-height: 1; font-weight: 300;
+}
+.quick-add {
+  flex: 1; min-width: 0; padding: 0; border: 0; outline: none; background: none;
+  color: var(--fg); font: inherit; -webkit-appearance: none; appearance: none;
+}
+.quick-add::placeholder { color: var(--muted); }
+
 /* ---------- Карточка идеи ---------- */
 .card { margin-top: 14px; padding: 18px 20px; border-radius: 20px; background: var(--cell); }
 .idea-text { white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
