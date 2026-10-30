@@ -183,6 +183,30 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .paged.page-next .page-items { animation: page-next .45s var(--soft) both; }
 .paged.page-prev .page-items { animation: page-prev .45s var(--soft) both; }
 
+/* ---------- Поиск ---------- */
+.search { display: flex; align-items: center; margin-top: 14px; }
+.search-field {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px;
+  height: 38px; padding: 0 10px; border-radius: 12px;
+  background: var(--field); color: var(--muted); cursor: text;
+}
+.search-field svg { flex: none; width: 17px; height: 17px; }
+.search-input {
+  flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: none;
+  color: var(--fg); font: inherit; -webkit-appearance: none; appearance: none;
+}
+.search-input::placeholder { color: var(--muted); }
+.search-input::-webkit-search-cancel-button,
+.search-input::-webkit-search-decoration { -webkit-appearance: none; }
+/* «Отмена» плавно выезжает справа, поле при этом сужается */
+.search-cancel {
+  max-width: 0; margin-left: 0; opacity: 0; overflow: hidden; white-space: nowrap;
+  transition: max-width .4s var(--soft), margin-left .4s var(--soft), opacity .25s ease;
+}
+.search.active .search-cancel { max-width: 90px; margin-left: 12px; opacity: 1; }
+.hl { color: var(--fg); font-weight: 600; }
+.search-results.list-swap, .search-body.list-swap { animation: in-fade .35s ease; }
+
 /* ---------- Чеклист ---------- */
 .group-head.with-bar { display: flex; align-items: center; gap: 12px; }
 .bar { flex: 1; height: 4px; border-radius: 2px; background: var(--field); overflow: hidden; }

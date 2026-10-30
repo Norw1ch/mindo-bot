@@ -80,6 +80,32 @@ function esc(text) {
   ));
 }
 
+// ---------- Поиск ----------
+
+// Текст для сравнения: без регистра, «ё» = «е»
+function norm(text) {
+  return String(text).toLowerCase().replace(/ё/g, 'е');
+}
+
+// Выделяет найденное: «Купить <b>домен</b>». Возвращает безопасный HTML
+function highlight(text, query) {
+  const i = norm(text).indexOf(norm(query));
+  if (i < 0) return esc(text);
+  const end = i + query.length;
+  return `${esc(text.slice(0, i))}<span class="hl">${esc(text.slice(i, end))}</span>${esc(text.slice(end))}`;
+}
+
+// Кусочек длинного текста вокруг найденного: «…начало <b>слово</b> конец…»
+function snippet(text, query, around = 24) {
+  const line = text.replace(/\s+/g, ' ');
+  const i = norm(line).indexOf(norm(query));
+  if (i < 0) return '';
+  const from = Math.max(0, i - around);
+  const to = Math.min(line.length, i + query.length + around);
+  const part = line.slice(from, to);
+  return `${from > 0 ? '…' : ''}${highlight(part, query)}${to < line.length ? '…' : ''}`;
+}
+
 // Обрезает длинный текст до n символов (для вопросов «Удалить …?»)
 function shorten(text, n) {
   const line = text.replace(/\s+/g, ' ').trim();

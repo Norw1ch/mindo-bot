@@ -298,6 +298,56 @@ function todayBlockHtml() {
     </div>`;
 }
 
+// ---------- Поиск ----------
+
+// Планы, где запрос есть в заголовке, описании или пунктах чеклиста.
+// Сначала активные, потом выполненные; внутри — новые сверху
+function searchIdeas(query) {
+  const q = norm(query);
+  const has = (text) => norm(text || '').includes(q);
+  return data.ideas
+    .filter((i) => findSection(i.sec) && (has(i.title) || has(i.text) || (i.items || []).some((it) => has(it.t))))
+    .sort((a, b) => (a.st === 'done') - (b.st === 'done') || b.at - a.at);
+}
+
+// Строка результата: найденное выделено; под заголовком раздел и кусочек текста с совпадением
+function searchRowHtml(idea, query) {
+  const section = findSection(idea.sec);
+  let found = '';
+  if (!norm(idea.title).includes(norm(query))) {
+    const item = (idea.items || []).find((it) => norm(it.t).includes(norm(query)));
+    found = snippet(idea.text || '', query) || (item ? `☐ ${highlight(item.t, query)}` : '');
+  }
+  return `
+    <button class="row" data-act="open-idea" data-id="${idea.id}">
+      <span class="st">${STATUS[idea.st].icon}</span>
+      <span class="title-wrap">
+        <span class="title">${highlight(idea.title, query)}</span>
+        <span class="subtitle">${esc(section.name)}${found ? ' · ' + found : ''}</span>
+      </span>
+      ${CHEVRON}
+    </button>`;
+}
+
+function searchListHtml(route) {
+  const query = (route.q || '').trim();
+  if (!query) return '';
+  const list = searchIdeas(query);
+  if (!list.length) return '<p class="empty small">Ничего не найдено</p>';
+  const p = paginate(list, route);
+  const rows = p.items.map((idea) => searchRowHtml(idea, query)).join('');
+  return `
+    <p class="group-head">Найдено · ${list.length}</p>
+    <div class="page-items"><div class="group">${rows}</div></div>${pagerHtml(p)}`;
+}
+
+searchHandlers.main = (route, query, inner) => {
+  const results = inner.querySelector('.search-results');
+  if (query) results.innerHTML = searchListHtml(route);
+  showSearchState(inner, Boolean(query));
+};
+
+pagers.main = searchListHtml;
 pagers.section = ideaListHtml;
 pagers.archive = archiveListHtml;
 pagers.agenda = agendaListHtml;
@@ -351,7 +401,7 @@ async function completeRecurring(idea, seg) {
 
 // ---------- Экраны ----------
 
-views.main = () => {
+views.main = (route) => {
   const rows = data.sections.map((s, n) => `
     <div class="swipe${takeFlash(s.id) ? ' appear' : ''}" style="--i:${n}">
       <button class="swipe-del" data-act="swipe-delete" data-kind="section" data-id="${s.id}">Удалить</button>
@@ -368,14 +418,21 @@ views.main = () => {
     ? `${today ? '<p class="group-head">Разделы</p>' : ''}<div class="group">${rows}</div>`
     : '';
 
+  // Пока в поиске есть текст — вместо обычного содержимого результаты
+  const searching = Boolean((route.q || '').trim());
+
   return `
     <h1>Мои планы</h1>
     <p class="sub">${data.sections.length ? 'Выбери раздел' : 'Разделов пока нет'}</p>
-    ${today}
-    ${sections}
-    <div class="actions">
-      <button class="btn primary" data-act="new-section">➕ Новый раздел</button>
-      <button class="btn" data-act="open-archive">🗄 Выполненные</button>
+    ${data.ideas.length ? searchHtml(route.q, 'Поиск по планам') : ''}
+    <div class="search-results paged${searching ? '' : ' hidden'}">${searching ? searchListHtml(route) : ''}</div>
+    <div class="search-body${searching ? ' hidden' : ''}">
+      ${today}
+      ${sections}
+      <div class="actions">
+        <button class="btn primary" data-act="new-section">➕ Новый раздел</button>
+        <button class="btn" data-act="open-archive">🗄 Выполненные</button>
+      </div>
     </div>`;
 };
 

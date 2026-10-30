@@ -338,6 +338,64 @@ function groupedPage(list, route, groupOf, rowOf) {
   return `<div class="page-items">${html}</div>${pagerHtml(p)}`;
 }
 
+// ---------- Строка поиска ----------
+// Поле с лупой и «Отменой». Модуль задаёт onSearch(route, query, inner) — что показать.
+// Поиск обновляет экран на месте, чтобы не терялся фокус и клавиатура
+
+const SEARCH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"'
+  + ' stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>';
+
+const searchHandlers = {}; // название экрана → onSearch(route, query, inner)
+
+function searchHtml(query, placeholder) {
+  return `
+    <div class="search${query ? ' active' : ''}">
+      <label class="search-field">
+        ${SEARCH_ICON}
+        <input type="search" class="search-input" placeholder="${placeholder}" value="${esc(query || '')}"
+          enterkeyhint="search" autocomplete="off" autocorrect="off" spellcheck="false">
+      </label>
+      <button class="search-cancel" data-act="search-cancel">Отмена</button>
+    </div>`;
+}
+
+function runSearch(input) {
+  const route = currentRoute();
+  route.q = input.value;
+  route.page = 0;
+  searchHandlers[route.name](route, route.q.trim(), input.closest('.screen-inner'));
+}
+
+document.addEventListener('input', (e) => {
+  if (e.target.classList.contains('search-input')) runSearch(e.target);
+});
+// «Отмена» выезжает, когда поле в фокусе или в нём есть текст
+document.addEventListener('focusin', (e) => {
+  if (e.target.classList.contains('search-input')) e.target.closest('.search').classList.add('active');
+});
+document.addEventListener('focusout', (e) => {
+  const input = e.target;
+  if (!input.classList.contains('search-input')) return;
+  // С задержкой — иначе «Отмена» начнёт уезжать прямо из-под пальца, пока его нажимают
+  setTimeout(() => {
+    if (!input.value && document.activeElement !== input) input.closest('.search').classList.remove('active');
+  }, 200);
+});
+// Enter прячет клавиатуру — результаты и так уже на экране
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.classList.contains('search-input')) e.target.blur();
+});
+
+// Показывает один из двух блоков (обычное содержимое или результаты) с мягким появлением
+function showSearchState(inner, searching) {
+  const results = inner.querySelector('.search-results');
+  const body = inner.querySelector('.search-body');
+  const was = !results.classList.contains('hidden');
+  results.classList.toggle('hidden', !searching);
+  body.classList.toggle('hidden', searching);
+  if (was !== searching) restartAnim(searching ? results : body, 'list-swap');
+}
+
 // ---------- Общие действия ----------
 
 Object.assign(actions, {
@@ -353,6 +411,15 @@ Object.assign(actions, {
     softHaptic();
     // Если начало списка ушло вверх за экран — плавно поднимаемся к нему
     if (box.getBoundingClientRect().top < 0) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
+
+  // «Отмена» в поиске: очистить, спрятать клавиатуру, вернуть обычный экран
+  'search-cancel': (data, el) => {
+    const input = el.closest('.search').querySelector('.search-input');
+    input.value = '';
+    input.blur();
+    el.closest('.search').classList.remove('active');
+    runSearch(input);
   },
 
   // Удаление свайпом: что именно удалять — решает модуль по data-kind
