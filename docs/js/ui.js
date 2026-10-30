@@ -154,6 +154,10 @@ async function back() {
     closeSheet(null);
     return;
   }
+  if (choiceResolve) {
+    closeChoice(null);
+    return;
+  }
   if (busy || stack.length < 2) return;
   busy = true;
   stack.pop();
@@ -218,7 +222,7 @@ function refresh() {
 
 function updateBackButton() {
   if (!inTelegram) return;
-  if (stack.length > 1 || sheetResolve) tg.BackButton.show();
+  if (stack.length > 1 || sheetResolve || choiceResolve) tg.BackButton.show();
   else tg.BackButton.hide();
 }
 
@@ -303,6 +307,29 @@ function pagerHtml({ page, pages }) {
       <span class="pager-info">${page + 1} / ${pages}</span>
       <button class="pager-btn" data-act="set-page" data-dir="1"${page === pages - 1 ? ' disabled' : ''}>${CHEVRON}</button>
     </div>`;
+}
+
+// Список с группами и листанием: на каждой странице заголовки групп строятся заново.
+// groupOf(item) → { key, label } (label — готовый HTML), rowOf(item, n) → HTML строки
+function groupedPage(list, route, groupOf, rowOf) {
+  const p = paginate(list, route);
+  let html = '';
+  let group = null;
+  let rows = [];
+  const flush = () => {
+    if (group) html += `<p class="group-head">${group.label}</p><div class="group">${rows.join('')}</div>`;
+  };
+  p.items.forEach((item, n) => {
+    const g = groupOf(item);
+    if (!group || g.key !== group.key) {
+      flush();
+      group = g;
+      rows = [];
+    }
+    rows.push(rowOf(item, n));
+  });
+  flush();
+  return `<div class="page-items">${html}</div>${pagerHtml(p)}`;
 }
 
 // ---------- Общие действия ----------
@@ -512,3 +539,51 @@ document.getElementById('sheet-save').addEventListener('click', saveSheet);
 document.getElementById('sheet-cancel').addEventListener('click', () => closeSheet(null));
 // Нажатие на затемнённый фон — отмена
 sheet.addEventListener('click', (e) => { if (e.target === sheet) closeSheet(null); });
+
+// ---------- Меню выбора снизу (как в iOS) ----------
+
+const choice = document.getElementById('choice');
+const choiceOpts = document.getElementById('choice-opts');
+let choiceResolve = null;
+let choiceTimer;
+
+// options: [{ key, label, danger }] или { label, date: '2026-10-30' } — пункт с календарём.
+// Возвращает key выбранного пункта, выбранную дату или null при отмене
+function choose({ title, options }) {
+  clearTimeout(choiceTimer);
+  closeSwipe();
+  document.getElementById('choice-title').textContent = title;
+  choiceOpts.innerHTML = options.map((o) => (o.date !== undefined
+    // Невидимое поле даты поверх пункта: нажатие открывает системный календарь
+    ? `<label class="choice-opt">${esc(o.label)}<input type="date" class="choice-date" value="${o.date}"></label>`
+    : `<button class="choice-opt${o.danger ? ' danger' : ''}" data-key="${o.key}">${esc(o.label)}</button>`)).join('');
+  choice.classList.remove('closing');
+  choice.classList.add('open');
+  return new Promise((resolve) => {
+    choiceResolve = resolve;
+    updateBackButton();
+  });
+}
+
+function closeChoice(result) {
+  if (!choiceResolve) return;
+  choice.classList.add('closing'); // меню плавно уезжает вниз
+  choiceTimer = setTimeout(() => choice.classList.remove('open', 'closing'), 320);
+  const resolve = choiceResolve;
+  choiceResolve = null;
+  updateBackButton();
+  resolve(result);
+}
+
+choice.addEventListener('click', (e) => {
+  const opt = e.target.closest('button.choice-opt');
+  if (opt) closeChoice(opt.dataset.key);
+  else if (e.target === choice || e.target.id === 'choice-cancel') closeChoice(null);
+  else if (e.target.classList.contains('choice-date')) {
+    // На компьютере календарь сам не открывается — просим явно
+    try { e.target.showPicker(); } catch { /* телефон откроет сам */ }
+  }
+});
+choice.addEventListener('change', (e) => {
+  if (e.target.classList.contains('choice-date') && e.target.value) closeChoice(e.target.value);
+});

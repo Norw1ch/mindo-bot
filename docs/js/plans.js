@@ -6,8 +6,9 @@
 
 // ---------- Данные ----------
 // sections: [{id, name}] — в ключе "sections"
-// ideas: {id, sec, title, text, st, at, dt} — каждый план в своём ключе "i_<id>"
-//   st — статус (new / wip / done), at — когда создан, dt — когда выполнен
+// ideas: {id, sec, title, text, st, at, dt, due} — каждый план в своём ключе "i_<id>"
+//   st — статус (new / wip / done), at — когда создан, dt — когда выполнен,
+//   due — срок «2026-10-30» или пусто
 
 const data = { sections: [], ideas: [] };
 
@@ -57,6 +58,18 @@ function filteredIdeas(sectionId, filter) {
   return data.ideas
     .filter((i) => i.sec === sectionId && (filter === 'all' ? i.st !== 'done' : i.st === filter))
     .sort((a, b) => (filter === 'done' ? (b.dt || 0) - (a.dt || 0) : b.at - a.at));
+}
+
+// Срок прошёл, а план не выполнен
+function isOverdue(idea) {
+  return Boolean(idea.due) && idea.st !== 'done' && idea.due < dayKey();
+}
+
+// Активные планы со сроком, по порядку дат (просроченные первыми)
+function datedIdeas() {
+  return data.ideas
+    .filter((i) => i.due && i.st !== 'done' && findSection(i.sec))
+    .sort((a, b) => a.due.localeCompare(b.due) || a.at - b.at);
 }
 
 function saveSections() {
@@ -130,42 +143,78 @@ function ideaListHtml(route) {
       <button class="row" data-act="open-idea" data-id="${idea.id}">
         <span class="st">${STATUS[idea.st].icon}</span>
         <span class="title">${esc(idea.title)}</span>
+        ${dueMeta(idea)}
         ${CHEVRON}
       </button>
     </div>`).join('');
   return `<div class="page-items"><div class="group">${rows}</div></div>${pagerHtml(p)}`;
 }
 
+// Срок справа в строке: «Завтра», «5 нояб.»; просроченный — красным
+function dueMeta(idea) {
+  if (!idea.due || idea.st === 'done') return '';
+  return `<span class="meta small${isOverdue(idea) ? ' late' : ''}">${dayLabel(idea.due)}</span>`;
+}
+
 // «Выполненные»: все Done по порядку разделов, на странице группируются по разделам
 function archiveListHtml(route) {
   const list = data.sections.flatMap((s) => filteredIdeas(s.id, 'done'));
   if (!list.length) return '<p class="empty">Здесь появятся планы со статусом ⚫ Done</p>';
-  const p = paginate(list, route);
+  return groupedPage(list, route, (idea) => {
+    const s = findSection(idea.sec);
+    return { key: s.id, label: `${esc(s.name)} · ${filteredIdeas(s.id, 'done').length}` };
+  }, doneRowHtml);
+}
 
-  let html = '';
-  let section = null;
-  let rows = [];
-  const flush = () => {
-    if (!section) return;
-    const total = filteredIdeas(section.id, 'done').length;
-    html += `
-      <p class="group-head">${esc(section.name)} · ${total}</p>
-      <div class="group">${rows.join('')}</div>`;
-  };
-  p.items.forEach((idea, n) => {
-    if (!section || section.id !== idea.sec) {
-      flush();
-      section = findSection(idea.sec);
-      rows = [];
-    }
-    rows.push(doneRowHtml(idea, n));
-  });
-  flush();
-  return `<div class="page-items">${html}</div>${pagerHtml(p)}`;
+// Строка плана со сроком: статус, заголовок, под ним раздел; withDue — показывать дату справа
+function agendaRowHtml(idea, withDue) {
+  const section = findSection(idea.sec);
+  return `
+    <button class="row" data-act="open-idea" data-id="${idea.id}">
+      <span class="st">${STATUS[idea.st].icon}</span>
+      <span class="title-wrap">
+        <span class="title">${esc(idea.title)}</span>
+        <span class="subtitle">${section ? esc(section.name) : ''}</span>
+      </span>
+      ${withDue ? dueMeta(idea) : ''}
+      ${CHEVRON}
+    </button>`;
+}
+
+// «Все сроки»: группы «Просрочено», «Сегодня», «Завтра», «Пятница, 7 ноября»…
+function agendaListHtml(route) {
+  const list = datedIdeas();
+  if (!list.length) return '<p class="empty">Задай срок в карточке плана — он появится здесь</p>';
+  const today = dayKey();
+  return groupedPage(list, route, (idea) => (idea.due < today
+    ? { key: 'late', label: 'Просрочено' }
+    : { key: idea.due, label: dayLabelLong(idea.due) }
+  ), (idea) => agendaRowHtml(idea, idea.due < today));
+}
+
+// Блок «Сегодня» на главном экране: просроченные и сегодняшние планы.
+// Если сроков нет ни у одного плана — блока нет
+function todayBlockHtml() {
+  const dated = datedIdeas();
+  if (!dated.length) return '';
+  const today = dayKey();
+  const now = dated.filter((i) => i.due <= today);
+  const rows = now.map((idea) => agendaRowHtml(idea, idea.due < today)).join('');
+  return `
+    <p class="group-head">Сегодня · ${formatDate(Date.now())}</p>
+    <div class="group">
+      ${rows || '<div class="row static"><span class="title muted">На сегодня ничего</span></div>'}
+      <button class="row" data-act="open-agenda">
+        <span class="title">Все сроки</span>
+        <span class="meta">${dated.length}</span>
+        ${CHEVRON}
+      </button>
+    </div>`;
 }
 
 pagers.section = ideaListHtml;
 pagers.archive = archiveListHtml;
+pagers.agenda = agendaListHtml;
 
 // Строка выполненного плана в «Выполненных»: ⚫, заголовок, дата выполнения
 function doneRowHtml(idea, n) {
@@ -199,10 +248,17 @@ views.main = () => {
       </button>
     </div>`).join('');
 
+  const today = todayBlockHtml();
+  // Если есть блок «Сегодня», у разделов тоже свой заголовок — чтобы было понятно, где что
+  const sections = rows
+    ? `${today ? '<p class="group-head">Разделы</p>' : ''}<div class="group">${rows}</div>`
+    : '';
+
   return `
     <h1>Мои планы</h1>
     <p class="sub">${data.sections.length ? 'Выбери раздел' : 'Разделов пока нет'}</p>
-    ${rows ? `<div class="group">${rows}</div>` : ''}
+    ${today}
+    ${sections}
     <div class="actions">
       <button class="btn primary" data-act="new-section">➕ Новый раздел</button>
       <button class="btn" data-act="open-archive">🗄 Выполненные</button>
@@ -251,6 +307,13 @@ views.idea = (route) => {
       <button class="btn primary" data-act="restore-idea" data-id="${idea.id}">↺ Вернуть в работу</button>
     </div>
     <div class="group">
+      <button class="row" data-act="set-due" data-id="${idea.id}">
+        <span class="title">Срок</span>
+        <span class="meta${isOverdue(idea) ? ' late' : ''}${takeFlash('due:' + idea.id) ? ' swap' : ''}">${idea.due ? dayLabel(idea.due) : 'Не задан'}</span>
+        ${CHEVRON}
+      </button>
+    </div>
+    <div class="group">
       <button class="row" data-act="edit-idea" data-id="${idea.id}">Изменить</button>
       <button class="row danger" data-act="delete-idea" data-id="${idea.id}">Удалить план</button>
     </div>`;
@@ -263,6 +326,15 @@ views.archive = (route) => {
     <h1>Выполненные</h1>
     <p class="sub">${total ? plural(total, ['план', 'плана', 'планов']) : 'Пока ничего не выполнено'}</p>
     <div class="paged">${archiveListHtml(route)}</div>`;
+};
+
+// «Все сроки»: активные планы с датой, сгруппированные по дням
+views.agenda = (route) => {
+  const n = datedIdeas().length;
+  return `
+    <h1>Сроки</h1>
+    <p class="sub">${n ? plural(n, ['план', 'плана', 'планов']) + ' с датой' : 'Нет планов со сроком'}</p>
+    <div class="paged">${agendaListHtml(route)}</div>`;
 };
 
 // ---------- Действия ----------
@@ -391,4 +463,28 @@ Object.assign(actions, {
   },
 
   'open-archive': () => go({ name: 'archive' }),
+
+  'open-agenda': () => go({ name: 'agenda' }),
+
+  // Срок: быстрые варианты, календарь или «Убрать срок»
+  'set-due': async ({ id }) => {
+    const idea = findIdea(id);
+    const today = dayKey();
+    const options = [
+      { key: today, label: 'Сегодня' },
+      { key: addDays(today, 1), label: 'Завтра' },
+      { key: addDays(today, 7), label: 'Через неделю' },
+      { label: 'Выбрать дату…', date: idea.due || today },
+    ];
+    if (idea.due) options.push({ key: 'none', label: 'Убрать срок', danger: true });
+    const picked = await choose({ title: 'Срок', options });
+    if (!picked) return;
+    const due = picked === 'none' ? null : picked;
+    if (due === (idea.due || null)) return;
+    flash = 'due:' + id;
+    await commit(() => {
+      idea.due = due;
+      return saveIdea(idea);
+    });
+  },
 });

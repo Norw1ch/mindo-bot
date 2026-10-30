@@ -107,6 +107,50 @@ function formatShort(ms) {
   return new Date(ms).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 }
 
+// ---------- Дни ----------
+// Сроки храним строкой «2026-10-30» по местному времени — так их легко сравнивать
+
+function dayKey(date = new Date()) {
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${m}-${d}`;
+}
+
+function keyToDate(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function addDays(key, n) {
+  const date = keyToDate(key);
+  date.setDate(date.getDate() + n);
+  return dayKey(date);
+}
+
+// Коротко: «Сегодня», «Завтра», «Вчера», иначе «5 нояб.»
+function dayLabel(key) {
+  const today = dayKey();
+  if (key === today) return 'Сегодня';
+  if (key === addDays(today, 1)) return 'Завтра';
+  if (key === addDays(today, -1)) return 'Вчера';
+  const date = keyToDate(key);
+  const opts = { day: 'numeric', month: 'short' };
+  if (date.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return date.toLocaleDateString('ru-RU', opts);
+}
+
+// Подробно, для заголовков: «Сегодня», «Завтра», иначе «Пятница, 7 ноября»
+function dayLabelLong(key) {
+  const today = dayKey();
+  if (key === today) return 'Сегодня';
+  if (key === addDays(today, 1)) return 'Завтра';
+  const date = keyToDate(key);
+  const opts = { weekday: 'long', day: 'numeric', month: 'long' };
+  if (date.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  const text = date.toLocaleDateString('ru-RU', opts);
+  return text[0].toUpperCase() + text.slice(1);
+}
+
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

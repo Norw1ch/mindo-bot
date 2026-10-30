@@ -113,6 +113,17 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .row.danger { color: var(--red); }
 .row .st { flex: none; width: 22px; text-align: center; font-size: 15px; }
 .row .meta.small { font-size: 15px; white-space: nowrap; }
+.meta.late { color: var(--red); }
+.muted { color: var(--muted); }
+/* Строка-надпись, на которую нельзя нажать */
+.row.static, .row.static:active { cursor: default; background: var(--cell); }
+/* Заголовок с подписью под ним (например, название раздела) */
+.row .title-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.row .title-wrap .title { flex: none; }
+.row .subtitle {
+  margin-top: 1px; color: var(--muted); font-size: 13px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* Заголовок группы, как в настройках iOS */
 .group-head {
@@ -251,6 +262,48 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .sheet-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
 .sheet-actions .btn { height: 48px; border-radius: 16px; background: var(--field); }
 .sheet-actions .btn.primary { background: var(--inv-bg); }
+
+/* ---------- Меню выбора снизу (как в iOS) ---------- */
+.choice {
+  position: fixed; inset: 0; z-index: 11;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 0 8px calc(8px + var(--safe-b));
+  background: var(--backdrop);
+  opacity: 0; visibility: hidden;
+  transition: opacity .3s ease, visibility 0s linear .3s;
+}
+.choice.open { opacity: 1; visibility: visible; transition: opacity .3s ease; }
+.choice.open.closing { opacity: 0; transition: opacity .3s ease; }
+.choice-box {
+  width: 100%; max-width: 520px; margin: 0 auto;
+  transform: translateY(110%); transition: transform .45s var(--ease);
+}
+.choice.open .choice-box { transform: none; }
+.choice.closing .choice-box { transform: translateY(110%); transition-duration: .32s; }
+.choice-list {
+  overflow: hidden; border-radius: 18px; background: var(--sheet);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+}
+.choice-title { padding: 14px 16px 12px; color: var(--muted); font-size: 13px; text-align: center; }
+.choice-opt {
+  position: relative; display: block; width: 100%; padding: 16px;
+  font-size: 18px; text-align: center; cursor: pointer;
+  transition: background-color .3s ease;
+}
+.choice-opt::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 0.5px; background: var(--sep); }
+.choice-opt:active { background: var(--cell-press); transition: none; }
+.choice-opt.danger { color: var(--red); }
+/* Невидимое поле даты поверх пункта «Выбрать дату…» */
+.choice-date {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; border: 0; -webkit-appearance: none; appearance: none; cursor: pointer;
+}
+.choice-cancel {
+  display: block; width: 100%; margin-top: 8px; padding: 16px; border-radius: 18px;
+  background: var(--cell); font-size: 18px; font-weight: 600;
+  transition: transform .25s var(--soft);
+}
+.choice-cancel:active { transform: scale(0.98); }
 
 /* ---------- Всплывающая подсказка ---------- */
 .toast {
