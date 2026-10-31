@@ -18,7 +18,7 @@ function sortedNotes(list) {
 }
 
 function confirmDeleteNote(id) {
-  return confirmDialog(`Удалить заметку «${shorten(notes.find(id).title, 40)}»?`);
+  return confirmDialog(t('Удалить заметку «{0}»?', shorten(notes.find(id).title, 40)));
 }
 
 function deleteNoteData(id) {
@@ -37,7 +37,7 @@ function noteRowHtml(note, n, query) {
   preview = query ? (snippet(note.text || '', query) || esc(preview)) : esc(preview);
   return `
     <div class="swipe${takeFlash(note.id) ? ' appear' : ''}" style="--i:${n}">
-      <button class="swipe-del" data-act="swipe-delete" data-kind="note" data-id="${note.id}">Удалить</button>
+      <button class="swipe-del" data-act="swipe-delete" data-kind="note" data-id="${note.id}">${t('Удалить')}</button>
       <button class="row" data-act="open-note" data-id="${note.id}">
         <span class="title-wrap">
           <span class="title">${query ? highlight(note.title, query) : esc(note.title)}</span>
@@ -53,7 +53,7 @@ function notesListHtml(route) {
   const others = sortedNotes(notes.items.filter((n) => !n.pin));
   if (!others.length) return '';
   const p = paginate(others, route);
-  const head = notes.items.some((n) => n.pin) ? '<p class="group-head">Заметки</p>' : '';
+  const head = notes.items.some((n) => n.pin) ? `<p class="group-head">${t('Заметки')}</p>` : '';
   const rows = p.items.map((note, n) => noteRowHtml(note, n)).join('');
   return `${head}<div class="page-items"><div class="group">${rows}</div></div>${pagerHtml(p)}`;
 }
@@ -67,11 +67,11 @@ function searchNotes(query) {
 function notesSearchHtml(route) {
   const query = (route.q || '').trim();
   const list = searchNotes(query);
-  if (!list.length) return '<p class="empty small">Ничего не найдено</p>';
+  if (!list.length) return `<p class="empty small">${t('Ничего не найдено')}</p>`;
   const p = paginate(list, route);
   const rows = p.items.map((note, n) => noteRowHtml(note, n, query)).join('');
   return `
-    <p class="group-head">Найдено · ${list.length}</p>
+    <p class="group-head">${t('Найдено')} · ${list.length}</p>
     <div class="page-items"><div class="group">${rows}</div></div>${pagerHtml(p)}`;
 }
 
@@ -91,16 +91,16 @@ views.notes = (route) => {
   const searching = Boolean((route.q || '').trim());
   const pinned = sortedNotes(notes.items.filter((n) => n.pin));
   const pinnedHtml = pinned.length
-    ? `<p class="group-head">Закреплённые</p><div class="group">${pinned.map((note, n) => noteRowHtml(note, n)).join('')}</div>`
+    ? `<p class="group-head">${t('Закреплённые')}</p><div class="group">${pinned.map((note, n) => noteRowHtml(note, n)).join('')}</div>`
     : '';
 
   return `
-    <h1>Заметки</h1>
-    <p class="sub">${total ? plural(total, ['заметка', 'заметки', 'заметок']) : 'Заметок пока нет'}</p>
+    <h1>${t('Заметки')}</h1>
+    <p class="sub">${total ? plural(total, ['заметка', 'заметки', 'заметок']) : t('Заметок пока нет')}</p>
     <div class="actions">
-      <button class="btn primary" data-act="new-note">➕ Новая заметка</button>
+      <button class="btn primary" data-act="new-note">➕ ${t('Новая заметка')}</button>
     </div>
-    ${total ? searchHtml(route.q, 'Поиск по заметкам') : ''}
+    ${total ? searchHtml(route.q, t('Поиск по заметкам')) : ''}
     <div class="search-results paged${searching ? '' : ' hidden'}">${searching ? notesSearchHtml(route) : ''}</div>
     <div class="search-body${searching ? ' hidden' : ''}">
       ${pinnedHtml}
@@ -110,21 +110,21 @@ views.notes = (route) => {
 
 views.note = (route) => {
   const note = notes.find(route.id);
-  if (!note) return '<p class="empty">Заметка не найдена</p>';
+  if (!note) return `<p class="empty">${t('Заметка не найдена')}</p>`;
 
   // Заголовок и текст правятся прямо здесь — нажал и пишешь
   return `
-    <h1>${editHtml('note-title', note.id, note.title, { placeholder: 'Заголовок', max: NOTE_TITLE_MAX })}</h1>
-    <p class="sub">${note.pin ? 'Закреплена · ' : ''}Изменена ${formatDate(note.up)}</p>
+    <h1>${editHtml('note-title', note.id, note.title, { placeholder: t('Заголовок'), max: NOTE_TITLE_MAX })}</h1>
+    <p class="sub">${note.pin ? `${t('Закреплена')} · ` : ''}${t('Изменена {0}', formatDate(note.up))}</p>
     <div class="card">
       ${editHtml('note-text', note.id, note.text, {
-        placeholder: 'Текст заметки…', max: NOTE_TEXT_MAX, multiline: true, cls: 'idea-text',
+        placeholder: t('Текст заметки…'), max: NOTE_TEXT_MAX, multiline: true, cls: 'idea-text',
       })}
     </div>
     <div class="group">
-      <button class="row" data-act="pin-note" data-id="${note.id}">${note.pin ? 'Открепить' : 'Закрепить'}</button>
-      <button class="row" data-act="copy-note" data-id="${note.id}">Скопировать текст</button>
-      <button class="row danger" data-act="delete-note" data-id="${note.id}">Удалить заметку</button>
+      <button class="row" data-act="pin-note" data-id="${note.id}">${t(note.pin ? 'Открепить' : 'Закрепить')}</button>
+      <button class="row" data-act="copy-note" data-id="${note.id}">${t('Скопировать текст')}</button>
+      <button class="row danger" data-act="delete-note" data-id="${note.id}">${t('Удалить заметку')}</button>
     </div>`;
 };
 
@@ -153,14 +153,14 @@ editors['note-text'] = {
 
 function noteFields(note = { title: '', text: '' }) {
   return [
-    { value: note.title, placeholder: 'Заголовок', max: NOTE_TITLE_MAX },
-    { value: note.text, placeholder: 'Текст', max: NOTE_TEXT_MAX, multiline: true, optional: true },
+    { value: note.title, placeholder: t('Заголовок'), max: NOTE_TITLE_MAX },
+    { value: note.text, placeholder: t('Текст'), max: NOTE_TEXT_MAX, multiline: true, optional: true },
   ];
 }
 
 Object.assign(actions, {
   'new-note': async () => {
-    const res = await ask({ title: 'Новая заметка', fields: noteFields() });
+    const res = await ask({ title: t('Новая заметка'), fields: noteFields() });
     if (!res) return;
     const [title, text] = res;
     const now = Date.now();
@@ -181,13 +181,13 @@ Object.assign(actions, {
       note.pin = !note.pin;
       return notes.save();
     });
-    if (ok) toast(note.pin ? 'Закреплено' : 'Откреплено');
+    if (ok) toast(t(note.pin ? 'Закреплено' : 'Откреплено'));
   },
 
   'copy-note': async ({ id }) => {
     const note = notes.find(id);
     const ok = await copyText(note.text ? `${note.title}\n\n${note.text}` : note.title);
-    toast(ok ? 'Скопировано' : 'Не удалось скопировать');
+    toast(t(ok ? 'Скопировано' : 'Не удалось скопировать'));
     if (ok) softHaptic();
   },
 

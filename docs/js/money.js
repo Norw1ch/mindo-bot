@@ -29,16 +29,25 @@ const expenses = makeBucket('exp_');
 modules.money = {
   load(raw) {
     mcats = parse(raw.mcats) || DEFAULT_CATS.map((c) => ({ ...c }));
+    localizeCats();
     expenses.load(raw);
   },
 };
+
+// Стандартные категории показываем на выбранном языке, а переименованные — как есть
+function localizeCats() {
+  mcats.forEach((c) => {
+    const std = DEFAULT_CATS.find((d) => d.id === c.id);
+    if (std && allSpellings(std.name).includes(c.name)) c.name = t(std.name);
+  });
+}
 
 function saveCats() {
   return store.set('mcats', JSON.stringify(mcats));
 }
 
 function findCat(id) {
-  return mcats.find((c) => c.id === id) || mcats.find((c) => c.id === OTHER) || { id: OTHER, name: 'Другое' };
+  return mcats.find((c) => c.id === id) || mcats.find((c) => c.id === OTHER) || { id: OTHER, name: t('Другое') };
 }
 
 // «250», «99,50», «1 250.5» → копейки. Неверное — 0
@@ -50,12 +59,12 @@ function parseAmount(text) {
 }
 
 function checkAmount(text) {
-  return parseAmount(text) ? null : 'Введите сумму, например 250 или 99,50';
+  return parseAmount(text) ? null : t('Введите сумму, например 250 или 99,50');
 }
 
 // 125050 → «1 250,50 ₴»
 function formatMoney(kop) {
-  const text = (kop / 100).toLocaleString('ru-RU', {
+  const text = (kop / 100).toLocaleString(locale(), {
     minimumFractionDigits: kop % 100 ? 2 : 0,
     maximumFractionDigits: 2,
   });
@@ -64,7 +73,7 @@ function formatMoney(kop) {
 
 // Сумма для правки: «1250,5»
 function amountText(kop) {
-  return String(kop / 100).replace('.', ',');
+  return String(kop / 100).replace('.', lang === 'en' ? '.' : ',');
 }
 
 // Границы месяца: offset — сдвиг от текущего (0 — этот, -1 — прошлый)
@@ -95,7 +104,7 @@ function todaySpent() {
 
 function confirmDeleteExpense(id) {
   const e = expenses.find(id);
-  return confirmDialog(`Удалить расход ${formatMoney(e.a)} (${findCat(e.c).name})?`);
+  return confirmDialog(t('Удалить расход {0} ({1})?', formatMoney(e.a), findCat(e.c).name));
 }
 
 function deleteExpenseData(id) {
@@ -106,8 +115,8 @@ function deleteExpenseData(id) {
 
 function confirmDeleteCat(id) {
   const used = expenses.items.filter((e) => e.c === id).length;
-  const extra = used ? `\nРасходы из неё (${used}) перейдут в «Другое».` : '';
-  return confirmDialog(`Удалить категорию «${findCat(id).name}»?${extra}`);
+  const extra = used ? `\n${t('Расходы из неё ({0}) перейдут в «Другое».', used)}` : '';
+  return confirmDialog(`${t('Удалить категорию «{0}»?', findCat(id).name)}${extra}`);
 }
 
 // Удалить категорию: её расходы переносим в «Другое»
@@ -133,7 +142,7 @@ function expenseRowHtml(e, n) {
   const cat = findCat(e.c);
   return `
     <div class="swipe${takeFlash(e.id) ? ' appear' : ''}" style="--i:${n}">
-      <button class="swipe-del" data-act="swipe-delete" data-kind="expense" data-id="${e.id}">Удалить</button>
+      <button class="swipe-del" data-act="swipe-delete" data-kind="expense" data-id="${e.id}">${t('Удалить')}</button>
       <button class="row" data-act="open-expense" data-id="${e.id}">
         ${avatar(cat.name)}
         <span class="title-wrap">
@@ -148,7 +157,7 @@ function expenseRowHtml(e, n) {
 // Расходы по дням с листанием. route.catId — только одна категория
 function expenseListHtml(route) {
   const list = monthExpenses(route.month || 0, route.catId);
-  if (!list.length) return '<p class="empty small">Расходов пока нет</p>';
+  if (!list.length) return `<p class="empty small">${t('Расходов пока нет')}</p>`;
   return groupedPage(list, route, (e) => {
     const key = dayKey(new Date(e.t));
     return { key, label: dayLabelLong(key) };
@@ -158,9 +167,9 @@ function expenseListHtml(route) {
 // Поиск по всему: по категории, комментарию и сумме («1 250» найдёт 1250). Свежие сверху
 function searchExpenses(query) {
   const q = norm(query);
-  const amount = q.replace(/\s/g, '').replace('.', ',');
+  const amount = q.replace(/\s/g, '').replace(',', '.');
   return expenses.items
-    .filter((e) => norm(findCat(e.c).name).includes(q) || norm(e.n || '').includes(q) || amountText(e.a).includes(amount))
+    .filter((e) => norm(findCat(e.c).name).includes(q) || norm(e.n || '').includes(q) || String(e.a / 100).includes(amount))
     .sort((a, b) => b.t - a.t);
 }
 
@@ -190,7 +199,7 @@ function catsBreakdownHtml(offset) {
   const rows = [...byCat.entries()].sort((a, b) => b[1] - a[1]);
   const max = rows[0][1];
   return `
-    <p class="group-head">По категориям</p>
+    <p class="group-head">${t('По категориям')}</p>
     <div class="group">${rows.map(([id, total]) => {
       const cat = findCat(id);
       return `
@@ -219,10 +228,10 @@ function monthHtml(route) {
           <button class="pager-btn" data-act="money-month" data-dir="1"${offset >= 0 ? ' disabled' : ''}>${CHEVRON}</button>
         </div>
         <b class="total-sum${takeFlash('total') ? ' swap' : ''}">${formatMoney(sum(list))}</b>
-        <span class="total-sub">${list.length ? plural(list.length, ['расход', 'расхода', 'расходов']) : 'Расходов нет'}</span>
+        <span class="total-sub">${list.length ? plural(list.length, ['расход', 'расхода', 'расходов']) : t('Расходов нет')}</span>
       </div>
       ${catsBreakdownHtml(offset)}
-      ${list.length ? '<p class="group-head">Расходы</p>' : ''}
+      ${list.length ? `<p class="group-head">${t('Расходы')}</p>` : ''}
       <div class="paged">${list.length ? expenseListHtml(route) : ''}</div>
     </div>`;
 }
@@ -233,13 +242,13 @@ pagers.mcat = expenseListHtml;
 // ---------- Экраны ----------
 
 views.money = (route) => `
-  <h1>Расходы</h1>
+  <h1>${t('Расходы')}</h1>
   <div class="actions">
-    <button class="btn primary" data-act="add-expense">➕ Добавить расход</button>
+    <button class="btn primary" data-act="add-expense">➕ ${t('Добавить расход')}</button>
   </div>
   <div class="month-box paged">${monthHtml(route)}</div>
   <div class="group">
-    <button class="row" data-act="open-mcats"><span class="title">Категории</span><span class="meta">${mcats.length}</span>${CHEVRON}</button>
+    <button class="row" data-act="open-mcats"><span class="title">${t('Категории')}</span><span class="meta">${mcats.length}</span>${CHEVRON}</button>
   </div>`;
 
 // Расходы одной категории за выбранный месяц
@@ -254,28 +263,28 @@ views.mcat = (route) => {
 
 views.expense = (route) => {
   const e = expenses.find(route.id);
-  if (!e) return '<p class="empty">Расход не найден</p>';
+  if (!e) return `<p class="empty">${t('Расход не найден')}</p>`;
   const cat = findCat(e.c);
   return `
-    <h1>${editHtml('exp-amount', e.id, amountText(e.a), { placeholder: 'Сумма', max: 14, inputmode: 'decimal' })}</h1>
-    <p class="sub">Сумма в ${CURRENCY} — нажми, чтобы изменить</p>
+    <h1>${editHtml('exp-amount', e.id, amountText(e.a), { placeholder: t('Сумма'), max: 14, inputmode: 'decimal' })}</h1>
+    <p class="sub">${t('Сумма в {0} — нажми, чтобы изменить', CURRENCY)}</p>
     <div class="card">
-      ${editHtml('exp-note', e.id, e.n, { placeholder: 'Комментарий…', max: NOTE_MAX })}
+      ${editHtml('exp-note', e.id, e.n, { placeholder: t('Комментарий…'), max: NOTE_MAX })}
     </div>
     <div class="group">
       <button class="row" data-act="exp-cat" data-id="${e.id}">
-        <span class="title">Категория</span>
+        <span class="title">${t('Категория')}</span>
         <span class="meta${takeFlash('cat:' + e.id) ? ' swap' : ''}">${esc(cat.name)}</span>
         ${CHEVRON}
       </button>
       <button class="row" data-act="exp-date" data-id="${e.id}">
-        <span class="title">Дата</span>
+        <span class="title">${t('Дата')}</span>
         <span class="meta${takeFlash('date:' + e.id) ? ' swap' : ''}">${dayLabel(dayKey(new Date(e.t)))}</span>
         ${CHEVRON}
       </button>
     </div>
     <div class="group">
-      <button class="row danger" data-act="delete-expense" data-id="${e.id}">Удалить расход</button>
+      <button class="row danger" data-act="delete-expense" data-id="${e.id}">${t('Удалить расход')}</button>
     </div>`;
 };
 
@@ -291,15 +300,15 @@ views.mcats = () => {
     if (c.id === OTHER) return row;
     return `
       <div class="swipe${takeFlash(c.id) ? ' appear' : ''}" style="--i:${n}">
-        <button class="swipe-del" data-act="swipe-delete" data-kind="mcat" data-id="${c.id}">Удалить</button>
+        <button class="swipe-del" data-act="swipe-delete" data-kind="mcat" data-id="${c.id}">${t('Удалить')}</button>
         ${row}
       </div>`;
   }).join('');
   return `
-    <h1>Категории</h1>
-    <p class="sub">Нажми, чтобы переименовать; свайп влево — удалить</p>
+    <h1>${t('Категории')}</h1>
+    <p class="sub">${t('Нажми, чтобы переименовать; свайп влево — удалить')}</p>
     <div class="actions">
-      <button class="btn primary" data-act="new-mcat">➕ Новая категория</button>
+      <button class="btn primary" data-act="new-mcat">➕ ${t('Новая категория')}</button>
     </div>
     <div class="group">${rows}</div>`;
 };
@@ -326,14 +335,14 @@ editors['exp-note'] = {
 
 // Новая категория: спросить название, сохранить, вернуть её id (или null при отмене)
 async function createCat() {
-  const res = await ask({ title: 'Новая категория', fields: [{ placeholder: 'Например, «Спорт»', max: CAT_NAME_MAX }] });
+  const res = await ask({ title: t('Новая категория'), fields: [{ placeholder: t('Например, «Спорт»'), max: CAT_NAME_MAX }] });
   if (!res) return null;
   const cat = { id: newId(), name: res[0] };
   mcats.splice(Math.max(0, mcats.findIndex((c) => c.id === OTHER)), 0, cat); // перед «Другое»
   try {
     await saveCats();
   } catch (err) {
-    toast(err.userMessage || 'Не удалось сохранить');
+    toast(err.userMessage || t('Не удалось сохранить'));
     await loadData().catch(() => {});
     return null;
   }
@@ -343,7 +352,7 @@ async function createCat() {
 // Выбор категории в меню снизу; внизу — «Новая категория…»
 async function pickCat(title, current) {
   const options = mcats.map((c) => ({ key: c.id, label: c.name, checked: c.id === current }));
-  options.push({ key: '__new', label: '＋ Новая категория…' });
+  options.push({ key: '__new', label: `＋ ${t('Новая категория')}…` });
   const picked = await choose({ title, options });
   if (picked === '__new') return createCat();
   return picked;
@@ -353,17 +362,17 @@ Object.assign(actions, {
   // Сначала сумма (цифровая клавиатура) и дата (по умолчанию сегодня), потом категория
   'add-expense': async () => {
     const res = await ask({
-      title: 'Новый расход',
+      title: t('Новый расход'),
       fields: [
-        { placeholder: `Сумма, ${CURRENCY}`, max: 14, inputmode: 'decimal', check: checkAmount },
-        { placeholder: 'Комментарий — необязательно', max: NOTE_MAX, optional: true },
+        { placeholder: t('Сумма, {0}', CURRENCY), max: 14, inputmode: 'decimal', check: checkAmount },
+        { placeholder: t('Комментарий — необязательно'), max: NOTE_MAX, optional: true },
       ],
       date: dayKey(),
     });
     if (!res) return;
-    const catId = await pickCat('Категория', null);
+    const catId = await pickCat(t('Категория'), null);
     if (!catId) {
-      toast('Расход не сохранён — не выбрана категория');
+      toast(t('Расход не сохранён — не выбрана категория'));
       return;
     }
     const day = res[2];
@@ -395,7 +404,7 @@ Object.assign(actions, {
 
   'exp-cat': async ({ id }) => {
     const e = expenses.find(id);
-    const catId = await pickCat('Категория', e.c);
+    const catId = await pickCat(t('Категория'), e.c);
     if (!catId || catId === e.c) return;
     flash = 'cat:' + id;
     await commit(() => {
@@ -409,16 +418,16 @@ Object.assign(actions, {
     const e = expenses.find(id);
     const today = dayKey();
     const picked = await choose({
-      title: 'Дата',
+      title: t('Дата'),
       options: [
-        { key: today, label: 'Сегодня' },
-        { key: addDays(today, -1), label: 'Вчера' },
-        { label: 'Выбрать дату…', date: dayKey(new Date(e.t)) },
+        { key: today, label: t('Сегодня') },
+        { key: addDays(today, -1), label: t('Вчера') },
+        { label: t('Выбрать дату…'), date: dayKey(new Date(e.t)) },
       ],
     });
     if (!picked || picked === dayKey(new Date(e.t))) return;
     if (picked > today) {
-      toast('Расход не может быть в будущем');
+      toast(t('Расход не может быть в будущем'));
       return;
     }
     const date = keyToDate(picked);
@@ -444,7 +453,7 @@ Object.assign(actions, {
 
   'rename-mcat': async ({ id }) => {
     const cat = findCat(id);
-    const res = await ask({ title: 'Переименовать категорию', fields: [{ value: cat.name, max: CAT_NAME_MAX }] });
+    const res = await ask({ title: t('Переименовать категорию'), fields: [{ value: cat.name, max: CAT_NAME_MAX }] });
     if (!res || res[0] === cat.name) return;
     flash = id;
     await commit(() => {

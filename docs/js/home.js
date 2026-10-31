@@ -4,7 +4,7 @@
 
 // «Суббота, 31 октября»
 function todayLine() {
-  const text = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
+  const text = new Date().toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' });
   return text[0].toUpperCase() + text.slice(1);
 }
 
@@ -19,14 +19,18 @@ function todayCardHtml() {
   const progress = total ? Math.round((done / total) * 100) : 0;
   return `
     <section class="today-card">
-      <p class="home-label">Сегодня</p>
+      <p class="home-label">${t('Сегодня')}</p>
       <div class="today-stats">
-        ${statHtml(`${done}/${total}`, 'привычки')}
-        ${statHtml(String(wipCount()), 'в работе')}
-        ${statHtml(formatMoney(todaySpent()), 'расходы', takeFlash('total') ? ' swap' : '')}
+        ${statHtml(`${done}/${total}`, t('привычки'))}
+        ${statHtml(String(wipCount()), t('в работе'))}
+        ${statHtml(formatMoney(todaySpent()), t('расходы'), takeFlash('total') ? ' swap' : '')}
       </div>
       <div class="today-bar"><span style="width:${progress}%"></span></div>
     </section>`;
+}
+
+function settingsIcon() {
+  return icon('<path d="M4 7h9M18 7h2M4 17h2M11 17h9"/><circle cx="15.5" cy="7" r="2.5"/><circle cx="8.5" cy="17" r="2.5"/>');
 }
 
 function plusIcon() {
@@ -44,23 +48,27 @@ function tileHtml(key, note) {
   return `
     <button class="tile" data-act="open-tab" data-tab="${key}">
       ${tab.icon}
-      <span class="tile-text"><b>${tab.label}</b><span>${note}</span></span>
+      <span class="tile-text"><b>${t(tab.label)}</b><span>${note}</span></span>
     </button>`;
 }
 
 function tilesHtml() {
   const { done, total } = habitsToday();
   return `
-    <p class="home-label tiles-head">Разделы</p>
+    <p class="home-label tiles-head">${t('Разделы')}</p>
     <div class="tiles">
-      ${tileHtml('plans', `${wipCount()} в работе`)}
+      ${tileHtml('plans', t('{0} в работе', wipCount()))}
       ${tileHtml('notes', plural(notes.items.length, ['заметка', 'заметки', 'заметок']))}
-      ${tileHtml('habits', `${done} из ${total} сегодня`)}
-      ${tileHtml('money', `${formatMoney(todaySpent())} сегодня`)}
+      ${tileHtml('habits', t('{0} из {1} сегодня', done, total))}
+      ${tileHtml('money', t('{0} сегодня', formatMoney(todaySpent())))}
       ${tileHtml('lists', plural(lists.items.length, ['список', 'списка', 'списков']))}
       <button class="tile add" data-act="quick-section">
         ${plusIcon()}
-        <span class="tile-text"><b>Новый раздел</b></span>
+        <span class="tile-text"><b>${t('Новый раздел')}</b></span>
+      </button>
+      <button class="tile wide" data-act="open-settings">
+        ${settingsIcon()}
+        <span class="tile-text"><b>${t('Настройки')}</b><span>${LANGS[lang].name}</span></span>
       </button>
     </div>`;
 }
@@ -82,9 +90,9 @@ function homeSearchHtml(route) {
   if (!query) return '';
   const found = SEARCH_GROUPS.flatMap((g) => {
     const items = g.find(query);
-    return items.map((item) => ({ g, item, label: `${g.label} · ${items.length}` }));
+    return items.map((item) => ({ g, item, label: `${t(g.label)} · ${items.length}` }));
   });
-  if (!found.length) return '<p class="empty small">Ничего не найдено</p>';
+  if (!found.length) return `<p class="empty small">${t('Ничего не найдено')}</p>`;
   return groupedPage(found, route, (f) => ({ key: f.g.label, label: f.label }), (f, n) => f.g.row(f.item, query, n));
 }
 
@@ -101,15 +109,15 @@ views.home = (route) => {
   const searching = Boolean((route.q || '').trim());
   return `
     <p class="home-date">${todayLine()}</p>
-    <h1>Главная</h1>
-    <div class="home-search">${searchHtml(route.q, 'Поиск по всему')}</div>
+    <h1>${t('Главная')}</h1>
+    <div class="home-search">${searchHtml(route.q, t('Поиск по всему'))}</div>
     <div class="search-results paged${searching ? '' : ' hidden'}">${searching ? homeSearchHtml(route) : ''}</div>
     <div class="search-body${searching ? ' hidden' : ''}">
       ${todayCardHtml()}
       <div class="quick-btns">
-        ${quickBtnHtml('quick-idea', 'Задача')}
-        ${quickBtnHtml('quick-note', 'Заметка')}
-        ${quickBtnHtml('add-expense', 'Расход')}
+        ${quickBtnHtml('quick-idea', t('Задача'))}
+        ${quickBtnHtml('quick-note', t('Заметка'))}
+        ${quickBtnHtml('add-expense', t('Расход'))}
       </div>
       ${tilesHtml()}
     </div>`;
@@ -117,7 +125,7 @@ views.home = (route) => {
 
 Object.assign(actions, {
   'quick-note': async () => {
-    if (await actions['new-note']()) toast('Заметка сохранена');
+    if (await actions['new-note']()) toast(t('Заметка сохранена'));
   },
 
   'open-tab': ({ tab }) => {

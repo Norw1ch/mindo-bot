@@ -39,8 +39,8 @@ const TABS = [
 // Заглушка для вкладок, которые появятся на следующих этапах
 views.soon = (route) => `
   <h1>${route.title}</h1>
-  <p class="sub">Скоро</p>
-  <p class="empty">Этот раздел появится на одном из следующих этапов</p>`;
+  <p class="sub">${t('Скоро')}</p>
+  <p class="empty">${t('Этот раздел появится на одном из следующих этапов')}</p>`;
 
 async function start() {
   applyTheme();
@@ -51,6 +51,7 @@ async function start() {
   buildTabbar();
   try {
     await loadData();
+    renderTabbar(); // язык мог прийти из облака
     root.replaceChildren(); // убираем «Загрузка…»
     switchTab('home');
     // Первый экран: строки появляются по очереди
@@ -58,7 +59,7 @@ async function start() {
     first.classList.add('intro');
     setTimeout(() => first.classList.remove('intro'), 1500);
   } catch (err) {
-    root.innerHTML = `<p class="empty">Не удалось загрузить данные.<br>${esc(err.message)}</p>`;
+    root.innerHTML = `<p class="empty">${t('Не удалось загрузить данные.')}<br>${esc(err.message)}</p>`;
   }
 }
 

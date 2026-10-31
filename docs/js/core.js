@@ -110,7 +110,7 @@ function makeBucket(prefix) {
       let size = 2;
       for (const item of this.items) {
         const len = JSON.stringify(item).length + 1;
-        if (len + 2 > CHUNK_MAX) throw userError('Слишком много текста');
+        if (len + 2 > CHUNK_MAX) throw userError(t('Слишком много текста'));
         if (pack.length && size + len > CHUNK_MAX) {
           next.push(JSON.stringify(pack));
           pack = [];
@@ -177,8 +177,10 @@ function shorten(text, n) {
   return line.length > n ? line.slice(0, n - 1) + '…' : line;
 }
 
-// 1 план, 2 плана, 5 планов
-function plural(n, [one, few, many]) {
+// 1 задача, 2 задачи, 5 задач. Формы на других языках — в PLURALS (lang.js)
+function plural(n, forms) {
+  const [one, few, many] = (PLURALS[forms[0]] && PLURALS[forms[0]][lang]) || forms;
+  if (lang === 'en') return `${n} ${n === 1 ? one : few}`;
   const d = n % 10;
   const dd = n % 100;
   const word = d === 1 && dd !== 11 ? one : d >= 2 && d <= 4 && (dd < 12 || dd > 14) ? few : many;
@@ -190,12 +192,12 @@ function formatDate(ms) {
   const date = new Date(ms);
   const opts = { day: 'numeric', month: 'long' };
   if (date.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
-  return date.toLocaleDateString('ru-RU', opts);
+  return date.toLocaleDateString(locale(), opts);
 }
 
 // Короткая дата для списков: «30 окт.»
 function formatShort(ms) {
-  return new Date(ms).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  return new Date(ms).toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
 }
 
 // ---------- Дни ----------
@@ -246,7 +248,7 @@ function stepRepeat(key, rep, anchor) {
 
 // «Октябрь 2026»
 function monthTitle(date) {
-  const text = date.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }).replace(' г.', '');
+  const text = date.toLocaleDateString(locale(), { month: 'long', year: 'numeric' }).replace(/ [гр]\.$/, '');
   return text[0].toUpperCase() + text.slice(1);
 }
 
@@ -259,30 +261,30 @@ function monthOffset(key) {
 
 // Полная дата: «31 окт. 2026 г.»
 function fullDate(key) {
-  return keyToDate(key).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+  return keyToDate(key).toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 // Коротко: «Сегодня», «Завтра», «Вчера», иначе «5 нояб.»
 function dayLabel(key) {
   const today = dayKey();
-  if (key === today) return 'Сегодня';
-  if (key === addDays(today, 1)) return 'Завтра';
-  if (key === addDays(today, -1)) return 'Вчера';
+  if (key === today) return t('Сегодня');
+  if (key === addDays(today, 1)) return t('Завтра');
+  if (key === addDays(today, -1)) return t('Вчера');
   const date = keyToDate(key);
   const opts = { day: 'numeric', month: 'short' };
   if (date.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
-  return date.toLocaleDateString('ru-RU', opts);
+  return date.toLocaleDateString(locale(), opts);
 }
 
 // Подробно, для заголовков: «Сегодня», «Завтра», иначе «Пятница, 7 ноября»
 function dayLabelLong(key) {
   const today = dayKey();
-  if (key === today) return 'Сегодня';
-  if (key === addDays(today, 1)) return 'Завтра';
+  if (key === today) return t('Сегодня');
+  if (key === addDays(today, 1)) return t('Завтра');
   const date = keyToDate(key);
   const opts = { weekday: 'long', day: 'numeric', month: 'long' };
   if (date.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
-  const text = date.toLocaleDateString('ru-RU', opts);
+  const text = date.toLocaleDateString(locale(), opts);
   return text[0].toUpperCase() + text.slice(1);
 }
 
@@ -290,9 +292,9 @@ function dayLabelLong(key) {
 function whenLabel(ms) {
   const key = dayKey(new Date(ms));
   if (key === dayKey()) {
-    return new Date(ms).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    return new Date(ms).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
   }
-  return key === addDays(dayKey(), -1) ? 'Вчера' : formatShort(ms);
+  return key === addDays(dayKey(), -1) ? t('Вчера') : formatShort(ms);
 }
 
 // Скопировать текст в буфер обмена; если новый способ недоступен — старым

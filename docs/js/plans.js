@@ -106,7 +106,7 @@ function saveIdea(idea) {
   const json = JSON.stringify(idea);
   if (json.length > RECORD_MAX) {
     const err = new Error('record too big');
-    err.userMessage = 'Слишком много текста в задаче';
+    err.userMessage = t('Слишком много текста в задаче');
     return Promise.reject(err);
   }
   return store.set('i_' + idea.id, json);
@@ -124,7 +124,7 @@ async function deleteIdeaData(id) {
 }
 
 function confirmDeleteIdea(id) {
-  return confirmDialog(`Удалить задачу «${shorten(findIdea(id).title, 40)}»?`);
+  return confirmDialog(t('Удалить задачу «{0}»?', shorten(findIdea(id).title, 40)));
 }
 
 // Удаляет раздел вместе с его планами: сначала планы, потом сам раздел
@@ -138,8 +138,8 @@ async function deleteSectionData(id) {
 function confirmDeleteSection(id) {
   const s = findSection(id);
   const count = data.ideas.filter((i) => i.sec === id).length;
-  const extra = count ? `\nВместе с ним удалятся задачи: ${count}.` : '';
-  return confirmDialog(`Удалить раздел «${s.name}»?${extra}`);
+  const extra = count ? `\n${t('Вместе с ним удалятся задачи: {0}.', count)}` : '';
+  return confirmDialog(`${t('Удалить раздел «{0}»?', s.name)}${extra}`);
 }
 
 deleters.idea = { confirm: confirmDeleteIdea, remove: deleteIdeaData };
@@ -182,12 +182,12 @@ function ideaListHtml(route) {
   const filter = route.filter || 'all';
   const all = filteredIdeas(route.id, filter);
   if (!all.length) {
-    return `<div class="page-items"><p class="empty small">${filter === 'all' ? 'Задач пока нет' : 'Здесь пусто'}</p></div>`;
+    return `<div class="page-items"><p class="empty small">${t(filter === 'all' ? 'Задач пока нет' : 'Здесь пусто')}</p></div>`;
   }
   const p = paginate(all, route);
   const rows = p.items.map((idea, n) => `
     <div class="swipe${takeFlash(idea.id) ? ' appear' : ''}" style="--i:${n}">
-      <button class="swipe-del" data-act="swipe-delete" data-kind="idea" data-id="${idea.id}">Удалить</button>
+      <button class="swipe-del" data-act="swipe-delete" data-kind="idea" data-id="${idea.id}">${t('Удалить')}</button>
       <button class="row" data-act="open-idea" data-id="${idea.id}">
         <span class="st">${STATUS[idea.st].icon}</span>
         <span class="title">${esc(idea.title)}</span>
@@ -208,10 +208,10 @@ function itemsMeta(idea) {
 // Заголовок чеклиста: «Чеклист · 2 из 5» и полоска прогресса
 function checklistHead(idea) {
   const { done, total } = itemsProgress(idea);
-  if (!total) return '<p class="group-head">Чеклист</p>';
+  if (!total) return `<p class="group-head">${t('Чеклист')}</p>`;
   return `
     <p class="group-head with-bar">
-      <span class="ch-label">Чеклист · ${done} из ${total}</span>
+      <span class="ch-label">${t('Чеклист · {0} из {1}', done, total)}</span>
       <span class="bar"><span style="width:${(done / total) * 100}%"></span></span>
     </p>`;
 }
@@ -220,7 +220,7 @@ function checklistHead(idea) {
 function checklistHtml(idea) {
   const rows = (idea.items || []).map((it, n) => `
     <div class="swipe${takeFlash(it.id) ? ' appear' : ''}" style="--i:${n}">
-      <button class="swipe-del" data-act="swipe-delete" data-kind="item" data-id="${idea.id}:${it.id}">Удалить</button>
+      <button class="swipe-del" data-act="swipe-delete" data-kind="item" data-id="${idea.id}:${it.id}">${t('Удалить')}</button>
       <button class="row check-row${it.d ? ' checked' : ''}" data-act="toggle-item" data-id="${idea.id}" data-item="${it.id}">
         ${CHECK}
         <span class="title wrap">${esc(it.t)}</span>
@@ -233,7 +233,7 @@ function checklistHtml(idea) {
         ${rows}
         <button class="row add-row" data-act="add-items" data-id="${idea.id}">
           <span class="plus">+</span>
-          <span class="title">Добавить пункт</span>
+          <span class="title">${t('Добавить пункт')}</span>
         </button>
       </div>
     </div>`;
@@ -248,7 +248,7 @@ function dueMeta(idea) {
 // «Выполненные»: все Done по порядку разделов, на странице группируются по разделам
 function archiveListHtml(route) {
   const list = data.sections.flatMap((s) => filteredIdeas(s.id, 'done'));
-  if (!list.length) return '<p class="empty">Здесь появятся задачи со статусом ⚫ Done</p>';
+  if (!list.length) return `<p class="empty">${t('Здесь появятся задачи со статусом ⚫ Done')}</p>`;
   return groupedPage(list, route, (idea) => {
     const s = findSection(idea.sec);
     return { key: s.id, label: `${esc(s.name)} · ${filteredIdeas(s.id, 'done').length}` };
@@ -273,10 +273,10 @@ function agendaRowHtml(idea, withDue) {
 // «Все сроки»: группы «Просрочено», «Сегодня», «Завтра», «Пятница, 7 ноября»…
 function agendaListHtml(route) {
   const list = datedIdeas();
-  if (!list.length) return '<p class="empty">Задай срок в карточке задачи — она появится здесь</p>';
+  if (!list.length) return `<p class="empty">${t('Задай срок в карточке задачи — она появится здесь')}</p>`;
   const today = dayKey();
   return groupedPage(list, route, (idea) => (idea.due < today
-    ? { key: 'late', label: 'Просрочено' }
+    ? { key: 'late', label: t('Просрочено') }
     : { key: idea.due, label: dayLabelLong(idea.due) }
   ), (idea) => agendaRowHtml(idea, idea.due < today));
 }
@@ -290,11 +290,11 @@ function todayBlockHtml() {
   const now = dated.filter((i) => i.due <= today);
   const rows = now.map((idea) => agendaRowHtml(idea, idea.due < today)).join('');
   return `
-    <p class="group-head">Сегодня · ${formatDate(Date.now())}</p>
+    <p class="group-head">${t('Сегодня')} · ${formatDate(Date.now())}</p>
     <div class="group">
-      ${rows || '<div class="row static"><span class="title muted">На сегодня ничего</span></div>'}
+      ${rows || `<div class="row static"><span class="title muted">${t('На сегодня ничего')}</span></div>`}
       <button class="row" data-act="open-agenda">
-        <span class="title">Все сроки</span>
+        <span class="title">${t('Все сроки')}</span>
         <span class="meta">${dated.length}</span>
         ${CHEVRON}
       </button>
@@ -336,11 +336,11 @@ function searchListHtml(route) {
   const query = (route.q || '').trim();
   if (!query) return '';
   const list = searchIdeas(query);
-  if (!list.length) return '<p class="empty small">Ничего не найдено</p>';
+  if (!list.length) return `<p class="empty small">${t('Ничего не найдено')}</p>`;
   const p = paginate(list, route);
   const rows = p.items.map((idea) => searchRowHtml(idea, query)).join('');
   return `
-    <p class="group-head">Найдено · ${list.length}</p>
+    <p class="group-head">${t('Найдено')} · ${list.length}</p>
     <div class="page-items"><div class="group">${rows}</div></div>${pagerHtml(p)}`;
 }
 
@@ -359,7 +359,7 @@ pagers.agenda = agendaListHtml;
 function doneRowHtml(idea, n) {
   return `
     <div class="swipe" style="--i:${n}">
-      <button class="swipe-del" data-act="swipe-delete" data-kind="idea" data-id="${idea.id}">Удалить</button>
+      <button class="swipe-del" data-act="swipe-delete" data-kind="idea" data-id="${idea.id}">${t('Удалить')}</button>
       <button class="row" data-act="open-idea" data-id="${idea.id}">
         <span class="st">${STATUS.done.icon}</span>
         <span class="title">${esc(idea.title)}</span>
@@ -370,9 +370,9 @@ function doneRowHtml(idea, n) {
 }
 
 function dateLine(idea) {
-  const done = idea.st === 'done' && idea.dt ? ` · выполнена ${formatDate(idea.dt)}` : '';
-  const times = idea.cnt ? ` · сделано ${plural(idea.cnt, ['раз', 'раза', 'раз'])}` : '';
-  return `Создана ${formatDate(idea.at)}${done}${times}`;
+  const done = idea.st === 'done' && idea.dt ? ` · ${t('выполнена {0}', formatDate(idea.dt))}` : '';
+  const times = idea.cnt ? ` · ${t('сделано {0}', plural(idea.cnt, ['раз', 'раза', 'раз']))}` : '';
+  return `${t('Создана {0}', formatDate(idea.at))}${done}${times}`;
 }
 
 // Повторяющийся план «выполнен»: таблетка доезжает до Done, план переезжает на следующую дату,
@@ -392,7 +392,7 @@ async function completeRecurring(idea, seg) {
     refresh();
     return;
   }
-  toast(`Готово! Следующий раз — ${dayLabel(next).toLowerCase()}`);
+  toast(t('Готово! Следующий раз — {0}', dayLabel(next).toLowerCase()));
   await wait(650);
   const route = currentRoute();
   if (route.name !== 'idea' || route.id !== idea.id) return; // уже ушли с карточки
@@ -407,7 +407,7 @@ async function completeRecurring(idea, seg) {
 views.main = (route) => {
   const rows = data.sections.map((s, n) => `
     <div class="swipe${takeFlash(s.id) ? ' appear' : ''}" style="--i:${n}">
-      <button class="swipe-del" data-act="swipe-delete" data-kind="section" data-id="${s.id}">Удалить</button>
+      <button class="swipe-del" data-act="swipe-delete" data-kind="section" data-id="${s.id}">${t('Удалить')}</button>
       <button class="row" data-act="open-section" data-id="${s.id}">
         <span class="title">${esc(s.name)}</span>
         <span class="meta">${activeCount(s.id)}</span>
@@ -418,85 +418,82 @@ views.main = (route) => {
   const today = todayBlockHtml();
   // Если есть блок «Сегодня», у разделов тоже свой заголовок — чтобы было понятно, где что
   const sections = rows
-    ? `${today ? '<p class="group-head">Разделы</p>' : ''}<div class="group">${rows}</div>`
+    ? `${today ? `<p class="group-head">${t('Разделы')}</p>` : ''}<div class="group">${rows}</div>`
     : '';
 
   // Пока в поиске есть текст — вместо обычного содержимого результаты
   const searching = Boolean((route.q || '').trim());
 
   return `
-    <h1>Мои задачи</h1>
-    <p class="sub">${data.sections.length ? 'Выбери раздел' : 'Разделов пока нет'}</p>
-    ${data.ideas.length ? searchHtml(route.q, 'Поиск по задачам') : ''}
+    <h1>${t('Мои задачи')}</h1>
+    <p class="sub">${t(data.sections.length ? 'Выбери раздел' : 'Разделов пока нет')}</p>
+    ${data.ideas.length ? searchHtml(route.q, t('Поиск по задачам')) : ''}
     <div class="search-results paged${searching ? '' : ' hidden'}">${searching ? searchListHtml(route) : ''}</div>
     <div class="search-body${searching ? ' hidden' : ''}">
       ${today}
       ${sections}
       <div class="actions">
-        <button class="btn primary" data-act="new-section">➕ Новый раздел</button>
-        <button class="btn" data-act="open-archive">🗄 Выполненные</button>
-      </div>
-      <div class="group">
-        <button class="row" data-act="open-backup"><span class="title muted">Резервная копия</span>${CHEVRON}</button>
+        <button class="btn primary" data-act="new-section">➕ ${t('Новый раздел')}</button>
+        <button class="btn" data-act="open-archive">🗄 ${t('Выполненные')}</button>
       </div>
     </div>`;
 };
 
 views.section = (route) => {
   const s = findSection(route.id);
-  if (!s) return '<p class="empty">Раздел не найден</p>';
+  if (!s) return `<p class="empty">${t('Раздел не найден')}</p>`;
 
   const filter = route.filter || 'all';
   const active = filteredIdeas(s.id, 'all').length;
 
   return `
     <h1${takeFlash(s.id) ? ' class="swap"' : ''}>${esc(s.name)}</h1>
-    <p class="sub">${active ? plural(active, ['задача', 'задачи', 'задач']) + ' в работе' : 'Активных задач нет'}</p>
+    <p class="sub">${active ? t('{0} в работе', plural(active, ['задача', 'задачи', 'задач'])) : t('Активных задач нет')}</p>
     <div class="actions">
-      <button class="btn primary" data-act="add-idea" data-id="${s.id}">➕ Новая задача</button>
+      <button class="btn primary" data-act="add-idea" data-id="${s.id}">➕ ${t('Новая задача')}</button>
     </div>
-    ${segHtml(FILTERS, filter, 'set-filter')}
+    ${segHtml(FILTERS.map((f) => ({ ...f, html: t(f.html) })), filter, 'set-filter')}
     <div class="paged">${ideaListHtml(route)}</div>
     <div class="group">
-      <button class="row" data-act="rename-section" data-id="${s.id}">Переименовать</button>
-      <button class="row danger" data-act="delete-section" data-id="${s.id}">Удалить раздел</button>
+      <button class="row" data-act="rename-section" data-id="${s.id}">${t('Переименовать')}</button>
+      <button class="row danger" data-act="delete-section" data-id="${s.id}">${t('Удалить раздел')}</button>
     </div>`;
 };
 
 views.idea = (route) => {
   const idea = findIdea(route.id);
-  if (!idea) return '<p class="empty">Задача не найдена</p>';
+  if (!idea) return `<p class="empty">${t('Задача не найдена')}</p>`;
   const section = findSection(idea.sec);
 
   // Заголовок и описание правятся прямо здесь — нажал и пишешь
   return `
-    <h1>${editHtml('idea-title', idea.id, idea.title, { placeholder: 'Заголовок', max: TITLE_MAX })}</h1>
+    <h1>${editHtml('idea-title', idea.id, idea.title, { placeholder: t('Заголовок'), max: TITLE_MAX })}</h1>
     <p class="sub">${section ? esc(section.name) : ''}</p>
     ${segHtml(STATUS_ITEMS, idea.st, 'set-status', ` data-id="${idea.id}"`, 'big')}
     <div class="card">
       ${editHtml('idea-text', idea.id, idea.text, {
-        placeholder: 'Добавить описание…', max: IDEA_MAX, multiline: true, cls: 'idea-text',
+        placeholder: t('Добавить описание…'), max: IDEA_MAX, multiline: true, cls: 'idea-text',
       })}
       <p class="date">${dateLine(idea)}</p>
     </div>
     <div class="actions restore${idea.st === 'done' ? '' : ' hidden'}">
-      <button class="btn primary" data-act="restore-idea" data-id="${idea.id}">↺ Вернуть в работу</button>
+      <button class="btn primary" data-act="restore-idea" data-id="${idea.id}">↺ ${t('Вернуть в работу')}</button>
     </div>
     ${checklistHtml(idea)}
     <div class="group">
       <button class="row" data-act="set-due" data-id="${idea.id}">
-        <span class="title">Срок</span>
-        <span class="meta${isOverdue(idea) ? ' late' : ''}${takeFlash('due:' + idea.id) ? ' swap' : ''}">${idea.due ? dayLabel(idea.due) : 'Не задан'}</span>
+        <span class="title">${t('Срок')}</span>
+        <span class="meta${isOverdue(idea) ? ' late' : ''}${takeFlash('due:' + idea.id) ? ' swap' : ''}">${idea.due ? dayLabel(idea.due) : t('Не задан')}</span>
         ${CHEVRON}
       </button>
       <button class="row" data-act="set-repeat" data-id="${idea.id}">
-        <span class="title">Повтор</span>
-        <span class="meta${takeFlash('rep:' + idea.id) ? ' swap' : ''}">${idea.rep ? REPEATS[idea.rep] : 'Нет'}</span>
+        <span class="title">${t('Повтор')}</span>
+        <span class="meta${takeFlash('rep:' + idea.id) ? ' swap' : ''}">${t(idea.rep ? REPEATS[idea.rep] : 'Нет')}</span>
         ${CHEVRON}
       </button>
     </div>
     <div class="group">
-      <button class="row danger" data-act="delete-idea" data-id="${idea.id}">Удалить задачу</button>
+      <button class="row danger" data-act="delete-idea" data-id="${idea.id}">${t('Удалить задачу')}</button>
     </div>`;
 };
 
@@ -523,8 +520,8 @@ editors['idea-text'] = {
 views.archive = (route) => {
   const total = data.ideas.filter((i) => i.st === 'done').length;
   return `
-    <h1>Выполненные</h1>
-    <p class="sub">${total ? plural(total, ['задача', 'задачи', 'задач']) : 'Пока ничего не выполнено'}</p>
+    <h1>${t('Выполненные')}</h1>
+    <p class="sub">${total ? plural(total, ['задача', 'задачи', 'задач']) : t('Пока ничего не выполнено')}</p>
     <div class="paged">${archiveListHtml(route)}</div>`;
 };
 
@@ -532,8 +529,8 @@ views.archive = (route) => {
 views.agenda = (route) => {
   const n = datedIdeas().length;
   return `
-    <h1>Сроки</h1>
-    <p class="sub">${n ? plural(n, ['задача', 'задачи', 'задач']) + ' с датой' : 'Нет задач со сроком'}</p>
+    <h1>${t('Сроки')}</h1>
+    <p class="sub">${n ? t('{0} с датой', plural(n, ['задача', 'задачи', 'задач'])) : t('Нет задач со сроком')}</p>
     <div class="paged">${agendaListHtml(route)}</div>`;
 };
 
@@ -542,14 +539,14 @@ views.agenda = (route) => {
 // Поля окна для плана: заголовок и необязательное описание
 function ideaFields(idea = { title: '', text: '' }) {
   return [
-    { value: idea.title, placeholder: 'Заголовок', max: TITLE_MAX },
-    { value: idea.text, placeholder: 'Описание — необязательно', max: IDEA_MAX, multiline: true, optional: true },
+    { value: idea.title, placeholder: t('Заголовок'), max: TITLE_MAX },
+    { value: idea.text, placeholder: t('Описание — необязательно'), max: IDEA_MAX, multiline: true, optional: true },
   ];
 }
 
 // Новый раздел: спросить название, сохранить, вернуть его id (или null при отмене)
 async function createSection() {
-  const res = await ask({ title: 'Новый раздел', fields: [{ placeholder: 'Название', max: SECTION_MAX }] });
+  const res = await ask({ title: t('Новый раздел'), fields: [{ placeholder: t('Название'), max: SECTION_MAX }] });
   if (!res) return null;
   const [name] = res;
   const id = newId();
@@ -565,7 +562,7 @@ async function createSection() {
 async function pickSection(title) {
   if (!data.sections.length) return createSection();
   const options = data.sections.map((s) => ({ key: s.id, label: s.name }));
-  options.push({ key: '__new', label: '＋ Новый раздел…' });
+  options.push({ key: '__new', label: `＋ ${t('Новый раздел')}…` });
   const picked = await choose({ title, options });
   if (picked === '__new') return createSection();
   return picked;
@@ -588,7 +585,7 @@ Object.assign(actions, {
 
   'rename-section': async ({ id }) => {
     const s = findSection(id);
-    const res = await ask({ title: 'Переименовать раздел', fields: [{ value: s.name, max: SECTION_MAX }] });
+    const res = await ask({ title: t('Переименовать раздел'), fields: [{ value: s.name, max: SECTION_MAX }] });
     if (!res || res[0] === s.name) return;
     const [name] = res;
     flash = id;
@@ -605,7 +602,7 @@ Object.assign(actions, {
   },
 
   'add-idea': async ({ id }) => {
-    const res = await ask({ title: 'Новая задача', fields: ideaFields() });
+    const res = await ask({ title: t('Новая задача'), fields: ideaFields() });
     if (!res) return;
     const [title, text] = res;
     // Новый план — Not started, он первый в списке. Если открыт фильтр, где его не видно,
@@ -618,14 +615,14 @@ Object.assign(actions, {
 
   // С главной: сначала текст, потом раздел
   'quick-idea': async () => {
-    const res = await ask({ title: 'Новая задача', fields: ideaFields() });
+    const res = await ask({ title: t('Новая задача'), fields: ideaFields() });
     if (!res) return;
-    const sec = await pickSection('Раздел');
+    const sec = await pickSection(t('Раздел'));
     if (!sec) {
-      toast('Задача не сохранена — не выбран раздел');
+      toast(t('Задача не сохранена — не выбран раздел'));
       return;
     }
-    if (await createIdea(sec, res[0], res[1])) toast(`Задача в разделе «${shorten(findSection(sec).name, 24)}»`);
+    if (await createIdea(sec, res[0], res[1])) toast(t('Задача в разделе «{0}»', shorten(findSection(sec).name, 24)));
   },
 
   'open-idea': ({ id }) => go({ name: 'idea', id }),
@@ -671,7 +668,7 @@ Object.assign(actions, {
     if (key === 'done') {
       revealBlock(restore, true, 220);
       successHaptic();
-      toast('Перенесено в «Выполненные»');
+      toast(t('Перенесено в «Выполненные»'));
     } else {
       revealBlock(restore, false);
     }
@@ -685,7 +682,7 @@ Object.assign(actions, {
       idea.dt = null;
       return saveIdea(idea);
     }, back);
-    if (ok) toast('Возвращено в работу');
+    if (ok) toast(t('Возвращено в работу'));
   },
 
   'delete-idea': async ({ id }) => {
@@ -701,8 +698,8 @@ Object.assign(actions, {
   'add-items': async ({ id }) => {
     const idea = findIdea(id);
     const res = await ask({
-      title: 'Новые пункты',
-      fields: [{ placeholder: 'Каждая строка — отдельный пункт', max: 2000, multiline: true }],
+      title: t('Новые пункты'),
+      fields: [{ placeholder: t('Каждая строка — отдельный пункт'), max: 2000, multiline: true }],
     });
     if (!res) return;
     const items = res[0].split('\n')
@@ -726,14 +723,14 @@ Object.assign(actions, {
     el.classList.toggle('checked', it.d);
     const box = el.closest('.checklist');
     const { done, total } = itemsProgress(idea);
-    setText(box.querySelector('.ch-label'), `Чеклист · ${done} из ${total}`);
+    setText(box.querySelector('.ch-label'), t('Чеклист · {0} из {1}', done, total));
     box.querySelector('.bar span').style.width = `${(done / total) * 100}%`;
     const ok = await commit(() => saveIdea(idea), () => {});
     if (!ok) {
       refresh();
       return;
     }
-    if (it.d && done === total && idea.st !== 'done') toast('Все пункты готовы — можно отметить ⚫ Done');
+    if (it.d && done === total && idea.st !== 'done') toast(t('Все пункты готовы — можно отметить ⚫ Done'));
   },
 
   // Срок: быстрые варианты, календарь или «Убрать срок»
@@ -741,13 +738,13 @@ Object.assign(actions, {
     const idea = findIdea(id);
     const today = dayKey();
     const options = [
-      { key: today, label: 'Сегодня' },
-      { key: addDays(today, 1), label: 'Завтра' },
-      { key: addDays(today, 7), label: 'Через неделю' },
-      { label: 'Выбрать дату…', date: idea.due || today },
+      { key: today, label: t('Сегодня') },
+      { key: addDays(today, 1), label: t('Завтра') },
+      { key: addDays(today, 7), label: t('Через неделю') },
+      { label: t('Выбрать дату…'), date: idea.due || today },
     ];
-    if (idea.due) options.push({ key: 'none', label: 'Убрать срок', danger: true });
-    const picked = await choose({ title: 'Срок', options });
+    if (idea.due) options.push({ key: 'none', label: t('Убрать срок'), danger: true });
+    const picked = await choose({ title: t('Срок'), options });
     if (!picked) return;
     const due = picked === 'none' ? null : picked;
     if (due === (idea.due || null)) return;
@@ -760,17 +757,17 @@ Object.assign(actions, {
       if (due && idea.rep) idea.rd = keyToDate(due).getDate();
       return saveIdea(idea);
     });
-    if (stopRepeat) toast('Повтор выключен');
+    if (stopRepeat) toast(t('Повтор выключен'));
   },
 
   // Повтор: каждый день / по будням / неделю / месяц / год
   'set-repeat': async ({ id }) => {
     const idea = findIdea(id);
     const options = [
-      { key: 'none', label: 'Не повторять', checked: !idea.rep },
-      ...Object.entries(REPEATS).map(([key, label]) => ({ key, label, checked: idea.rep === key })),
+      { key: 'none', label: t('Не повторять'), checked: !idea.rep },
+      ...Object.entries(REPEATS).map(([key, label]) => ({ key, label: t(label), checked: idea.rep === key })),
     ];
-    const picked = await choose({ title: 'Повтор', options });
+    const picked = await choose({ title: t('Повтор'), options });
     if (!picked) return;
     const rep = picked === 'none' ? null : picked;
     if (rep === (idea.rep || null)) return;
@@ -782,6 +779,6 @@ Object.assign(actions, {
       if (rep) idea.rd = keyToDate(idea.due).getDate();
       return saveIdea(idea);
     });
-    if (needDue) toast('Срок — сегодня');
+    if (needDue) toast(t('Срок — сегодня'));
   },
 });

@@ -42,7 +42,7 @@ async function commit(change, after = refresh) {
   } catch (err) {
     console.error(err);
     ok = false;
-    toast(err.userMessage || 'Не удалось сохранить'); // userMessage — понятное объяснение от модуля
+    toast(err.userMessage || t('Не удалось сохранить')); // userMessage — понятное объяснение от модуля
     await loadData().catch(() => {});
   }
   await after();
@@ -71,9 +71,23 @@ function currentRoute() {
   return stack[stack.length - 1];
 }
 
+function renderTabbar() {
+  tabbar.innerHTML = TABS.map((tab) => `
+    <button class="tab${tab.key === currentTab ? ' active' : ''}" data-tab="${tab.key}">${tab.icon}<span>${t(tab.label)}</span></button>`).join('');
+}
+
+// Язык сменился: подписи меню и текущий экран рисуем заново, а другие вкладки соберутся при открытии
+function relabelApp() {
+  renderTabbar();
+  Object.keys(panes).filter((key) => key !== currentTab).forEach((key) => {
+    panes[key].el.remove();
+    delete panes[key];
+  });
+  refresh();
+}
+
 function buildTabbar() {
-  tabbar.innerHTML = TABS.map((t) => `
-    <button class="tab" data-tab="${t.key}">${t.icon}<span>${t.label}</span></button>`).join('');
+  renderTabbar();
   tabbar.addEventListener('click', (e) => {
     const btn = e.target.closest('.tab');
     if (!btn) return;
@@ -327,7 +341,7 @@ function screenHtml(index) {
   const route = stack[index];
   // Вне Telegram показываем свою кнопку «Назад», в Telegram — встроенную
   const backLink = !inTelegram && index > 0
-    ? '<button class="back" data-act="back">← Назад</button>' : '';
+    ? `<button class="back" data-act="back">← ${t('Назад')}</button>` : '';
   return `<div class="screen-inner">${backLink}${views[route.name](route)}</div>`;
 }
 
@@ -554,7 +568,7 @@ async function flushEdit(el, final) {
     if (final) {
       el.value = editor.get(id);
       autoGrow(el);
-      toast(empty ? 'Пустым оставить нельзя — вернул прежнее' : editor.invalidText);
+      toast(t(empty ? 'Пустым оставить нельзя — вернул прежнее' : editor.invalidText));
     }
     return;
   }
@@ -562,7 +576,7 @@ async function flushEdit(el, final) {
     await editor.save(id, value);
   } catch (err) {
     console.error(err);
-    toast(err.userMessage || 'Не удалось сохранить');
+    toast(err.userMessage || t('Не удалось сохранить'));
     await loadData().catch(() => {});
     refresh();
   }
@@ -628,7 +642,7 @@ doneBtn.addEventListener('click', () => {
   const editing = el.classList.contains('inline-edit');
   el.blur(); // уход с поля сохраняет текст
   softHaptic();
-  if (editing) toast('Сохранено');
+  if (editing) toast(t('Сохранено'));
 });
 // Enter в однострочном поле (заголовке) убирает клавиатуру
 document.addEventListener('keydown', (e) => {
@@ -664,7 +678,7 @@ function searchHtml(query, placeholder) {
         <input type="search" class="search-input" placeholder="${placeholder}" value="${esc(query || '')}"
           enterkeyhint="search" autocomplete="off" autocorrect="off" spellcheck="false">
       </label>
-      <button class="search-cancel" data-act="search-cancel">Отмена</button>
+      <button class="search-cancel" data-act="search-cancel">${t('Отмена')}</button>
     </div>`;
 }
 
@@ -1070,7 +1084,7 @@ function saveSheet() {
   ));
   const missing = sheetInputs.find((el, i) => !el.dataset.optional && !values[i]);
   if (missing) {
-    toast('Пусто');
+    toast(t('Пусто'));
     focusInPlace(missing);
     return;
   }
@@ -1114,7 +1128,7 @@ function dateField(key) {
   const el = document.createElement('button');
   el.className = 'sheet-date';
   el.value = key;
-  el.innerHTML = `<span>Дата</span><span class="date-pill">${fullDate(key)}</span>`;
+  el.innerHTML = `<span>${t('Дата')}</span><span class="date-pill">${fullDate(key)}</span>`;
   return el;
 }
 
@@ -1135,7 +1149,7 @@ function datePopHtml(src) {
         <button class="pager-btn" data-dir="1"${src.month >= 0 ? ' disabled' : ''}>${CHEVRON}</button>
       </span>
     </div>
-    <div class="cal-week">${WEEKDAYS.map((d) => `<span>${d}</span>`).join('')}</div>
+    <div class="cal-week">${WEEKDAYS.map((d) => `<span>${t(d)}</span>`).join('')}</div>
     <div class="cal-viewport"><div class="cal-grid">${src.cells(src.month)}</div></div>`;
 }
 

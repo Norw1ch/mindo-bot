@@ -26,19 +26,19 @@ function downloadText(name, text) {
 async function restoreBackup(text) {
   const backup = parse(String(text).trim());
   if (!backup || backup.app !== BACKUP_APP || !backup.data || typeof backup.data !== 'object') {
-    toast('Это не похоже на копию «Мои задачи»');
+    toast(t('Это не похоже на копию «Мои задачи»'));
     return;
   }
   const entries = Object.entries(backup.data)
     .filter(([key, value]) => KEY_RE.test(key) && typeof value === 'string' && value.length <= 4096);
   if (!entries.length || entries.length > STORE_LIMIT) {
-    toast('Копия повреждена');
+    toast(t('Копия повреждена'));
     return;
   }
-  const question = `Восстановить копию от ${formatDate(backup.at)}?\nТекущие данные будут заменены.`;
+  const question = `${t('Восстановить копию от {0}?', formatDate(backup.at))}\n${t('Текущие данные будут заменены.')}`;
   if (!(await confirmDialog(question))) return;
 
-  toast('Восстанавливаю…');
+  toast(t('Восстанавливаю…'));
   try {
     const current = await store.loadAll();
     const keep = new Set(entries.map(([key]) => key));
@@ -50,10 +50,10 @@ async function restoreBackup(text) {
     }
   } catch (err) {
     console.error(err);
-    toast('Не удалось восстановить — попробуй ещё раз');
+    toast(t('Не удалось восстановить — попробуй ещё раз'));
     return;
   }
-  toast('Копия восстановлена');
+  toast(t('Копия восстановлена'));
   await wait(800);
   window.location.reload(); // проще всего показать восстановленные данные — перезапустить
 }
@@ -63,26 +63,25 @@ async function restoreBackup(text) {
 views.backup = () => {
   const used = Object.keys(lastRaw).length;
   return `
-    <h1>Резервная копия</h1>
-    <p class="sub">Задачи, заметки, списки, привычки и расходы</p>
+    <h1>${t('Резервная копия')}</h1>
+    <p class="sub">${t('Задачи, заметки, списки, привычки и расходы')}</p>
     <div class="card">
-      <p class="idea-text muted">Всё хранится в облаке Telegram. На всякий случай сохрани копию:
-      нажми «Скопировать копию» и вставь текст в «Избранное» Telegram.</p>
+      <p class="idea-text muted">${t('Всё хранится в облаке Telegram. На всякий случай сохрани копию: нажми «Скопировать копию» и вставь текст в «Избранное» Telegram.')}</p>
     </div>
     <div class="group">
-      <button class="row" data-act="backup-copy"><span class="title">Скопировать копию</span></button>
-      <button class="row" data-act="backup-download"><span class="title">Скачать файлом</span></button>
+      <button class="row" data-act="backup-copy"><span class="title">${t('Скопировать копию')}</span></button>
+      <button class="row" data-act="backup-download"><span class="title">${t('Скачать файлом')}</span></button>
     </div>
     <div class="group">
-      <button class="row" data-act="backup-paste"><span class="title">Восстановить из текста</span></button>
+      <button class="row" data-act="backup-paste"><span class="title">${t('Восстановить из текста')}</span></button>
       <label class="row">
-        <span class="title">Восстановить из файла</span>
+        <span class="title">${t('Восстановить из файла')}</span>
         <input type="file" class="restore-file" accept=".json,application/json,text/plain" hidden>
       </label>
     </div>
-    <p class="group-head">Хранилище</p>
+    <p class="group-head">${t('Хранилище')}</p>
     <div class="group">
-      <div class="row static"><span class="title">Записей занято</span><span class="meta">${used} из ${STORE_LIMIT}</span></div>
+      <div class="row static"><span class="title">${t('Записей занято')}</span><span class="meta">${t('{0} из {1}', used, STORE_LIMIT)}</span></div>
     </div>`;
 };
 
@@ -100,7 +99,7 @@ Object.assign(actions, {
     try {
       await loadData();
     } catch {
-      toast('Не удалось прочитать данные');
+      toast(t('Не удалось прочитать данные'));
       return;
     }
     go({ name: 'backup' });
@@ -109,23 +108,23 @@ Object.assign(actions, {
   // Копируем сразу по нажатию: телефоны разрешают буфер обмена только в момент нажатия
   'backup-copy': async () => {
     const ok = await copyText(backupText());
-    toast(ok ? 'Скопировано — вставь в «Избранное» Telegram' : 'Не удалось скопировать — попробуй «Скачать файлом»');
+    toast(t(ok ? 'Скопировано — вставь в «Избранное» Telegram' : 'Не удалось скопировать — попробуй «Скачать файлом»'));
     if (ok) softHaptic();
   },
 
   'backup-download': () => {
     try {
       downloadText(`mindo-backup-${dayKey()}.json`, backupText());
-      toast('Файл сохранён');
+      toast(t('Файл сохранён'));
     } catch {
-      toast('Скачивание здесь не работает — используй «Скопировать копию»');
+      toast(t('Скачивание здесь не работает — используй «Скопировать копию»'));
     }
   },
 
   'backup-paste': async () => {
     const res = await ask({
-      title: 'Вставь текст копии',
-      fields: [{ placeholder: 'Длинный текст, начинается с {"app":"mindo"…', max: 5000000, multiline: true }],
+      title: t('Вставь текст копии'),
+      fields: [{ placeholder: t('Длинный текст, начинается с {"app":"mindo"…'), max: 5000000, multiline: true }],
     });
     if (res) await restoreBackup(res[0]);
   },

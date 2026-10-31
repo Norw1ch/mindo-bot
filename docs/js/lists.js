@@ -16,9 +16,9 @@ modules.lists = { load: (raw) => lists.load(raw) };
 function listSummary(list) {
   const total = list.items.length;
   const left = list.items.filter((i) => !i.d).length;
-  if (!total) return 'Пусто';
-  if (!left) return 'Всё отмечено';
-  return `осталось ${left} из ${total}`;
+  if (!total) return t('Пусто');
+  if (!left) return t('Всё отмечено');
+  return t('осталось {0} из {1}', left, total);
 }
 
 // Поиск по всему: списки, где запрос есть в названии или в пунктах. Недавние сверху
@@ -44,7 +44,7 @@ function listSearchRowHtml(list, query) {
 }
 
 function confirmDeleteList(id) {
-  return confirmDialog(`Удалить список «${shorten(lists.find(id).name, 40)}»?`);
+  return confirmDialog(t('Удалить список «{0}»?', shorten(lists.find(id).name, 40)));
 }
 
 function deleteListData(id) {
@@ -70,7 +70,7 @@ function listRowHtml(list, n) {
   const left = list.items.filter((i) => !i.d).length;
   return `
     <div class="swipe${takeFlash(list.id) ? ' appear' : ''}" style="--i:${n}">
-      <button class="swipe-del" data-act="swipe-delete" data-kind="list" data-id="${list.id}">Удалить</button>
+      <button class="swipe-del" data-act="swipe-delete" data-kind="list" data-id="${list.id}">${t('Удалить')}</button>
       <button class="row" data-act="open-list" data-id="${list.id}">
         <span class="title-wrap">
           <span class="title">${esc(list.name)}</span>
@@ -86,7 +86,7 @@ function listRowHtml(list, n) {
 function litemRowHtml(list, it, n) {
   return `
     <div class="swipe${takeFlash(it.id) ? ' appear' : ''}" style="--i:${n}" data-item="${it.id}">
-      <button class="swipe-del" data-act="swipe-delete" data-kind="litem" data-id="${list.id}:${it.id}">Удалить</button>
+      <button class="swipe-del" data-act="swipe-delete" data-kind="litem" data-id="${list.id}:${it.id}">${t('Удалить')}</button>
       <button class="row check-row${it.d ? ' checked' : ''}" data-act="toggle-litem" data-id="${list.id}" data-item="${it.id}">
         ${CHECK}
         <span class="title wrap">${esc(it.t)}</span>
@@ -100,40 +100,40 @@ views.lists = () => {
   const all = [...lists.items].sort((a, b) => b.up - a.up); // недавно изменённые сверху
   const rows = all.map(listRowHtml).join('');
   return `
-    <h1>Списки</h1>
-    <p class="sub">${all.length ? plural(all.length, ['список', 'списка', 'списков']) : 'Списков пока нет'}</p>
+    <h1>${t('Списки')}</h1>
+    <p class="sub">${all.length ? plural(all.length, ['список', 'списка', 'списков']) : t('Списков пока нет')}</p>
     <div class="actions">
-      <button class="btn primary" data-act="new-list">➕ Новый список</button>
+      <button class="btn primary" data-act="new-list">➕ ${t('Новый список')}</button>
     </div>
     ${rows ? `<div class="group">${rows}</div>` : ''}`;
 };
 
 views.list = (route) => {
   const list = lists.find(route.id);
-  if (!list) return '<p class="empty">Список не найден</p>';
+  if (!list) return `<p class="empty">${t('Список не найден')}</p>`;
   const todo = list.items.filter((i) => !i.d);
   const done = list.items.filter((i) => i.d);
 
   return `
-    <h1>${editHtml('list-name', list.id, list.name, { placeholder: 'Название', max: LIST_NAME_MAX })}</h1>
+    <h1>${editHtml('list-name', list.id, list.name, { placeholder: t('Название'), max: LIST_NAME_MAX })}</h1>
     <p class="sub list-sub">${listSummary(list)}</p>
     <div class="group quick">
       <label class="row quick-row">
         <span class="plus">+</span>
-        <input class="quick-add" data-list="${list.id}" placeholder="Добавить пункт" maxlength="${LITEM_MAX}"
+        <input class="quick-add" data-list="${list.id}" placeholder="${t('Добавить пункт')}" maxlength="${LITEM_MAX}"
           autocomplete="off" enterkeyhint="enter">
       </label>
     </div>
     <div class="group todo-group">${todo.map((it, n) => litemRowHtml(list, it, n)).join('')}</div>
     ${done.length ? `
-      <p class="group-head">Отмечено · ${done.length}</p>
+      <p class="group-head">${t('Отмечено')} · ${done.length}</p>
       <div class="group">${done.map((it, n) => litemRowHtml(list, it, n)).join('')}</div>
       <div class="group">
-        <button class="row" data-act="uncheck-litems" data-id="${list.id}">Снять все отметки</button>
-        <button class="row danger" data-act="clear-litems" data-id="${list.id}">Удалить отмеченные</button>
+        <button class="row" data-act="uncheck-litems" data-id="${list.id}">${t('Снять все отметки')}</button>
+        <button class="row danger" data-act="clear-litems" data-id="${list.id}">${t('Удалить отмеченные')}</button>
       </div>` : ''}
     <div class="group">
-      <button class="row danger" data-act="delete-list" data-id="${list.id}">Удалить список</button>
+      <button class="row danger" data-act="delete-list" data-id="${list.id}">${t('Удалить список')}</button>
     </div>`;
 };
 
@@ -205,7 +205,7 @@ async function settleMoves(listId) {
 
 Object.assign(actions, {
   'new-list': async () => {
-    const res = await ask({ title: 'Новый список', fields: [{ placeholder: 'Например, «Продукты»', max: LIST_NAME_MAX }] });
+    const res = await ask({ title: t('Новый список'), fields: [{ placeholder: t('Например, «Продукты»'), max: LIST_NAME_MAX }] });
     if (!res) return;
     const now = Date.now();
     const list = { id: newId(), name: res[0], items: [], at: now, up: now };
@@ -252,7 +252,7 @@ Object.assign(actions, {
   'clear-litems': async ({ id }) => {
     const list = lists.find(id);
     const count = list.items.filter((i) => i.d).length;
-    if (!(await confirmDialog(`Удалить отмеченные пункты (${count})?`))) return;
+    if (!(await confirmDialog(t('Удалить отмеченные пункты ({0})?', count)))) return;
     await commit(() => {
       list.items = list.items.filter((i) => !i.d);
       list.up = Date.now();

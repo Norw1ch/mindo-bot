@@ -81,16 +81,16 @@ const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
 // «Каждый день», «По будням», «По выходным» или «Пн, Ср, Пт»
 function scheduleLabel(wd) {
-  if (!wd) return 'Каждый день';
+  if (!wd) return t('Каждый день');
   const key = wd.join();
-  if (key === '0,1,2,3,4') return 'По будням';
-  if (key === '5,6') return 'По выходным';
-  return wd.map((i) => WEEKDAYS[i]).join(', ');
+  if (key === '0,1,2,3,4') return t('По будням');
+  if (key === '5,6') return t('По выходным');
+  return wd.map((i) => t(WEEKDAYS[i])).join(', ');
 }
 
 // Серия: для ежедневных — «5 дн.», для привычек по графику — просто «5» (это разы, а не дни)
 function streakText(h, n) {
-  return h.wd ? `${n}` : `${n} дн.`;
+  return h.wd ? `${n}` : t('{0} дн.', n);
 }
 
 function totalDone(h) {
@@ -98,7 +98,7 @@ function totalDone(h) {
 }
 
 function confirmDeleteHabit(id) {
-  return confirmDialog(`Удалить привычку «${shorten(habits.find(id).name, 40)}»?`);
+  return confirmDialog(t('Удалить привычку «{0}»?', shorten(habits.find(id).name, 40)));
 }
 
 function deleteHabitData(id) {
@@ -123,16 +123,16 @@ function habitsToday() {
 
 // «Сегодня: 2 из 5»
 function habitsSummary() {
-  if (!habits.items.length) return 'Привычек пока нет';
+  if (!habits.items.length) return t('Привычек пока нет');
   const { done, total } = habitsToday();
-  if (!total) return 'Сегодня по графику ничего';
-  return `Сегодня: ${done} из ${total}`;
+  if (!total) return t('Сегодня по графику ничего');
+  return t('Сегодня: {0} из {1}', done, total);
 }
 
 // Подпись под названием: график и серия — «Пн, Ср, Пт · серия 3»
 function habitInfoText(h) {
   const s = streak(h);
-  return [h.wd ? scheduleLabel(h.wd) : '', s ? `серия ${streakText(h, s)}` : ''].filter(Boolean).join(' · ');
+  return [h.wd ? scheduleLabel(h.wd) : '', s ? t('серия {0}', streakText(h, s)) : ''].filter(Boolean).join(' · ');
 }
 
 // Поиск по всему: привычки по названию
@@ -180,7 +180,7 @@ function habitRowHtml(h, n) {
   const rest = isScheduled(h, today) ? '' : ' rest';
   return `
     <div class="swipe${takeFlash(h.id) ? ' appear' : ''}" style="--i:${n}">
-      <button class="swipe-del" data-act="swipe-delete" data-kind="habit" data-id="${h.id}">Удалить</button>
+      <button class="swipe-del" data-act="swipe-delete" data-kind="habit" data-id="${h.id}">${t('Удалить')}</button>
       <div class="row habit-row${rest}">
         <button class="habit-open" data-act="open-habit" data-id="${h.id}">${habitInfoHtml(h)}</button>
         <button class="habit-check${done ? ' checked' : ''}" data-act="toggle-habit-today" data-id="${h.id}">${CHECK}</button>
@@ -190,9 +190,9 @@ function habitRowHtml(h, n) {
 
 function statsHtml(h) {
   return `
-    <div class="stat"><b data-stat="streak">${streak(h)}</b><span>Серия</span></div>
-    <div class="stat"><b data-stat="best">${bestStreak(h)}</b><span>Лучшая</span></div>
-    <div class="stat"><b data-stat="total">${totalDone(h)}</b><span>Всего</span></div>`;
+    <div class="stat"><b data-stat="streak">${streak(h)}</b><span>${t('Серия')}</span></div>
+    <div class="stat"><b data-stat="best">${bestStreak(h)}</b><span>${t('Лучшая')}</span></div>
+    <div class="stat"><b data-stat="total">${totalDone(h)}</b><span>${t('Всего')}</span></div>`;
 }
 
 // Цифры статистики меняются мягко, только те, что изменились
@@ -238,7 +238,7 @@ function calendarHtml(h, route) {
       <span class="cal-title">${monthTitle(shownMonth(route))}</span>
       <button class="pager-btn" data-act="habit-month" data-dir="1"${(route.month || 0) >= 0 ? ' disabled' : ''}>${CHEVRON}</button>
     </div>
-    <div class="cal-week">${WEEKDAYS.map((d) => `<span>${d}</span>`).join('')}</div>
+    <div class="cal-week">${WEEKDAYS.map((d) => `<span>${t(d)}</span>`).join('')}</div>
     <div class="cal-viewport"><div class="cal-grid">${calCellsHtml(h, route)}</div></div>`;
 }
 
@@ -405,31 +405,31 @@ document.addEventListener('touchcancel', endCalDrag);
 views.habits = () => {
   const rows = [...habits.items].sort((a, b) => a.at - b.at).map(habitRowHtml).join('');
   return `
-    <h1>Привычки</h1>
+    <h1>${t('Привычки')}</h1>
     <p class="sub habits-sub">${habitsSummary()}</p>
     <div class="actions">
-      <button class="btn primary" data-act="new-habit">➕ Новая привычка</button>
+      <button class="btn primary" data-act="new-habit">➕ ${t('Новая привычка')}</button>
     </div>
     ${rows ? `<div class="group">${rows}</div>` : ''}`;
 };
 
 views.habit = (route) => {
   const h = habits.find(route.id);
-  if (!h) return '<p class="empty">Привычка не найдена</p>';
+  if (!h) return `<p class="empty">${t('Привычка не найдена')}</p>`;
   return `
-    <h1>${editHtml('habit-name', h.id, h.name, { placeholder: 'Название', max: HABIT_NAME_MAX })}</h1>
-    <p class="sub">С ${formatDate(h.at)}</p>
+    <h1>${editHtml('habit-name', h.id, h.name, { placeholder: t('Название'), max: HABIT_NAME_MAX })}</h1>
+    <p class="sub">${t('С {0}', formatDate(h.at))}</p>
     <div class="stats">${statsHtml(h)}</div>
     <div class="cal">${calendarHtml(h, route)}</div>
     <div class="group">
       <button class="row" data-act="habit-days" data-id="${h.id}">
-        <span class="title">Дни</span>
+        <span class="title">${t('Дни')}</span>
         <span class="meta${takeFlash('wd:' + h.id) ? ' swap' : ''}">${scheduleLabel(h.wd)}</span>
         ${CHEVRON}
       </button>
     </div>
     <div class="group">
-      <button class="row danger" data-act="delete-habit" data-id="${h.id}">Удалить привычку</button>
+      <button class="row danger" data-act="delete-habit" data-id="${h.id}">${t('Удалить привычку')}</button>
     </div>`;
 };
 
@@ -448,19 +448,19 @@ editors['habit-name'] = {
 function cheer(h) {
   const s = streak(h);
   if (!isDone(h, dayNum()) || !MILESTONES.includes(s)) return;
-  toast(`Серия ${h.wd ? plural(s, ['раз', 'раза', 'раз']) : daysWord(s)} подряд!`);
+  toast(t('Серия {0} подряд!', h.wd ? plural(s, ['раз', 'раза', 'раз']) : daysWord(s)));
 }
 
 // Выбор дней недели в меню снизу: кружки Пн–Вс, «Каждый день» и «Готово».
 // Возвращает null — каждый день, массив дней — по графику, undefined — отмена
 async function pickDays(current) {
   const chosen = new Set(current || [0, 1, 2, 3, 4, 5, 6]);
-  const result = choose({ title: 'В какие дни', options: [{ key: 'ok', label: 'Готово' }] });
-  const chips = WEEKDAYS.map((d, i) => `<button class="day-chip${chosen.has(i) ? ' on' : ''}" data-wd="${i}">${d}</button>`).join('');
+  const result = choose({ title: t('В какие дни'), options: [{ key: 'ok', label: t('Готово') }] });
+  const chips = WEEKDAYS.map((d, i) => `<button class="day-chip${chosen.has(i) ? ' on' : ''}" data-wd="${i}">${t(d)}</button>`).join('');
   document.getElementById('choice-opts').insertAdjacentHTML('afterbegin', `
     <div class="day-pick">
       <div class="day-chips">${chips}</div>
-      <button class="day-all">Каждый день</button>
+      <button class="day-all">${t('Каждый день')}</button>
     </div>`);
   if ((await result) !== 'ok') return undefined;
   const wd = [...document.querySelectorAll('.day-chip.on')].map((b) => Number(b.dataset.wd));
@@ -483,7 +483,7 @@ document.addEventListener('click', (e) => {
 
 Object.assign(actions, {
   'new-habit': async () => {
-    const res = await ask({ title: 'Новая привычка', fields: [{ placeholder: 'Например, «Зарядка»', max: HABIT_NAME_MAX }] });
+    const res = await ask({ title: t('Новая привычка'), fields: [{ placeholder: t('Например, «Зарядка»'), max: HABIT_NAME_MAX }] });
     if (!res) return;
     // Сразу спрашиваем дни; «Отмена» здесь — значит каждый день
     const wd = await pickDays(null);
