@@ -26,7 +26,7 @@ function downloadText(name, text) {
 async function restoreBackup(text) {
   const backup = parse(String(text).trim());
   if (!backup || backup.app !== BACKUP_APP || !backup.data || typeof backup.data !== 'object') {
-    toast('Это не похоже на копию «Мои планы»');
+    toast('Это не похоже на копию «Мои задачи»');
     return;
   }
   const entries = Object.entries(backup.data)
@@ -64,7 +64,7 @@ views.backup = () => {
   const used = Object.keys(lastRaw).length;
   return `
     <h1>Резервная копия</h1>
-    <p class="sub">Планы, заметки, списки, привычки и расходы</p>
+    <p class="sub">Задачи, заметки, списки, привычки и расходы</p>
     <div class="card">
       <p class="idea-text muted">Всё хранится в облаке Telegram. На всякий случай сохрани копию:
       нажми «Скопировать копию» и вставь текст в «Избранное» Telegram.</p>

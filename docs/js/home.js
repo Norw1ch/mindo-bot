@@ -70,7 +70,7 @@ function tilesHtml() {
 // Найденное открывается здесь же, на главной: «Назад» возвращает к результатам
 
 const SEARCH_GROUPS = [
-  { label: 'Планы', find: searchIdeas, row: searchRowHtml },
+  { label: 'Задачи', find: searchIdeas, row: searchRowHtml },
   { label: 'Заметки', find: searchNotes, row: (note, query, n) => noteRowHtml(note, n, query) },
   { label: 'Привычки', find: searchHabits, row: habitSearchRowHtml },
   { label: 'Расходы', find: searchExpenses, row: expenseSearchRowHtml },
@@ -107,7 +107,7 @@ views.home = (route) => {
     <div class="search-body${searching ? ' hidden' : ''}">
       ${todayCardHtml()}
       <div class="quick-btns">
-        ${quickBtnHtml('quick-idea', 'Идея')}
+        ${quickBtnHtml('quick-idea', 'Задача')}
         ${quickBtnHtml('quick-note', 'Заметка')}
         ${quickBtnHtml('add-expense', 'Расход')}
       </div>
@@ -125,7 +125,7 @@ Object.assign(actions, {
     switchTab(tab);
   },
 
-  // Раздел создаётся в Планах: сразу на их главный экран, там он и появится.
+  // Раздел создаётся в Задачах: сразу на их главный экран, там он и появится.
   // Всё без пауз: иначе iPhone не откроет клавиатуру для окна ввода
   'quick-section': () => {
     switchTab('plans');

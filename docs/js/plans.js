@@ -1,8 +1,8 @@
 'use strict';
 
-// Модуль «Планы»: разделы, планы, статусы, фильтры, «Выполненные».
-// В коде и хранилище планы называются ideas — так было с первой версии, менять нельзя,
-// иначе пропадут сохранённые данные
+// Модуль «Задачи»: разделы, задачи, статусы, фильтры, «Выполненные».
+// На экране это «задачи». В коде они остались планами (plans) и идеями (ideas), а в хранилище —
+// ideas: так было с первых версий, менять нельзя, иначе пропадут сохранённые данные
 
 // ---------- Данные ----------
 // sections: [{id, name}] — в ключе "sections"
@@ -106,7 +106,7 @@ function saveIdea(idea) {
   const json = JSON.stringify(idea);
   if (json.length > RECORD_MAX) {
     const err = new Error('record too big');
-    err.userMessage = 'Слишком много текста в плане';
+    err.userMessage = 'Слишком много текста в задаче';
     return Promise.reject(err);
   }
   return store.set('i_' + idea.id, json);
@@ -124,7 +124,7 @@ async function deleteIdeaData(id) {
 }
 
 function confirmDeleteIdea(id) {
-  return confirmDialog(`Удалить план «${shorten(findIdea(id).title, 40)}»?`);
+  return confirmDialog(`Удалить задачу «${shorten(findIdea(id).title, 40)}»?`);
 }
 
 // Удаляет раздел вместе с его планами: сначала планы, потом сам раздел
@@ -138,7 +138,7 @@ async function deleteSectionData(id) {
 function confirmDeleteSection(id) {
   const s = findSection(id);
   const count = data.ideas.filter((i) => i.sec === id).length;
-  const extra = count ? `\nВместе с ним удалятся планы: ${count}.` : '';
+  const extra = count ? `\nВместе с ним удалятся задачи: ${count}.` : '';
   return confirmDialog(`Удалить раздел «${s.name}»?${extra}`);
 }
 
@@ -182,7 +182,7 @@ function ideaListHtml(route) {
   const filter = route.filter || 'all';
   const all = filteredIdeas(route.id, filter);
   if (!all.length) {
-    return `<div class="page-items"><p class="empty small">${filter === 'all' ? 'Планов пока нет' : 'Здесь пусто'}</p></div>`;
+    return `<div class="page-items"><p class="empty small">${filter === 'all' ? 'Задач пока нет' : 'Здесь пусто'}</p></div>`;
   }
   const p = paginate(all, route);
   const rows = p.items.map((idea, n) => `
@@ -248,7 +248,7 @@ function dueMeta(idea) {
 // «Выполненные»: все Done по порядку разделов, на странице группируются по разделам
 function archiveListHtml(route) {
   const list = data.sections.flatMap((s) => filteredIdeas(s.id, 'done'));
-  if (!list.length) return '<p class="empty">Здесь появятся планы со статусом ⚫ Done</p>';
+  if (!list.length) return '<p class="empty">Здесь появятся задачи со статусом ⚫ Done</p>';
   return groupedPage(list, route, (idea) => {
     const s = findSection(idea.sec);
     return { key: s.id, label: `${esc(s.name)} · ${filteredIdeas(s.id, 'done').length}` };
@@ -273,7 +273,7 @@ function agendaRowHtml(idea, withDue) {
 // «Все сроки»: группы «Просрочено», «Сегодня», «Завтра», «Пятница, 7 ноября»…
 function agendaListHtml(route) {
   const list = datedIdeas();
-  if (!list.length) return '<p class="empty">Задай срок в карточке плана — он появится здесь</p>';
+  if (!list.length) return '<p class="empty">Задай срок в карточке задачи — она появится здесь</p>';
   const today = dayKey();
   return groupedPage(list, route, (idea) => (idea.due < today
     ? { key: 'late', label: 'Просрочено' }
@@ -370,9 +370,9 @@ function doneRowHtml(idea, n) {
 }
 
 function dateLine(idea) {
-  const done = idea.st === 'done' && idea.dt ? ` · выполнен ${formatDate(idea.dt)}` : '';
+  const done = idea.st === 'done' && idea.dt ? ` · выполнена ${formatDate(idea.dt)}` : '';
   const times = idea.cnt ? ` · сделано ${plural(idea.cnt, ['раз', 'раза', 'раз'])}` : '';
-  return `Создан ${formatDate(idea.at)}${done}${times}`;
+  return `Создана ${formatDate(idea.at)}${done}${times}`;
 }
 
 // Повторяющийся план «выполнен»: таблетка доезжает до Done, план переезжает на следующую дату,
@@ -425,9 +425,9 @@ views.main = (route) => {
   const searching = Boolean((route.q || '').trim());
 
   return `
-    <h1>Мои планы</h1>
+    <h1>Мои задачи</h1>
     <p class="sub">${data.sections.length ? 'Выбери раздел' : 'Разделов пока нет'}</p>
-    ${data.ideas.length ? searchHtml(route.q, 'Поиск по планам') : ''}
+    ${data.ideas.length ? searchHtml(route.q, 'Поиск по задачам') : ''}
     <div class="search-results paged${searching ? '' : ' hidden'}">${searching ? searchListHtml(route) : ''}</div>
     <div class="search-body${searching ? ' hidden' : ''}">
       ${today}
@@ -451,9 +451,9 @@ views.section = (route) => {
 
   return `
     <h1${takeFlash(s.id) ? ' class="swap"' : ''}>${esc(s.name)}</h1>
-    <p class="sub">${active ? plural(active, ['план', 'плана', 'планов']) + ' в работе' : 'Активных планов нет'}</p>
+    <p class="sub">${active ? plural(active, ['задача', 'задачи', 'задач']) + ' в работе' : 'Активных задач нет'}</p>
     <div class="actions">
-      <button class="btn primary" data-act="add-idea" data-id="${s.id}">➕ Новый план</button>
+      <button class="btn primary" data-act="add-idea" data-id="${s.id}">➕ Новая задача</button>
     </div>
     ${segHtml(FILTERS, filter, 'set-filter')}
     <div class="paged">${ideaListHtml(route)}</div>
@@ -465,7 +465,7 @@ views.section = (route) => {
 
 views.idea = (route) => {
   const idea = findIdea(route.id);
-  if (!idea) return '<p class="empty">План не найден</p>';
+  if (!idea) return '<p class="empty">Задача не найдена</p>';
   const section = findSection(idea.sec);
 
   // Заголовок и описание правятся прямо здесь — нажал и пишешь
@@ -496,7 +496,7 @@ views.idea = (route) => {
       </button>
     </div>
     <div class="group">
-      <button class="row danger" data-act="delete-idea" data-id="${idea.id}">Удалить план</button>
+      <button class="row danger" data-act="delete-idea" data-id="${idea.id}">Удалить задачу</button>
     </div>`;
 };
 
@@ -524,7 +524,7 @@ views.archive = (route) => {
   const total = data.ideas.filter((i) => i.st === 'done').length;
   return `
     <h1>Выполненные</h1>
-    <p class="sub">${total ? plural(total, ['план', 'плана', 'планов']) : 'Пока ничего не выполнено'}</p>
+    <p class="sub">${total ? plural(total, ['задача', 'задачи', 'задач']) : 'Пока ничего не выполнено'}</p>
     <div class="paged">${archiveListHtml(route)}</div>`;
 };
 
@@ -533,7 +533,7 @@ views.agenda = (route) => {
   const n = datedIdeas().length;
   return `
     <h1>Сроки</h1>
-    <p class="sub">${n ? plural(n, ['план', 'плана', 'планов']) + ' с датой' : 'Нет планов со сроком'}</p>
+    <p class="sub">${n ? plural(n, ['задача', 'задачи', 'задач']) + ' с датой' : 'Нет задач со сроком'}</p>
     <div class="paged">${agendaListHtml(route)}</div>`;
 };
 
@@ -605,7 +605,7 @@ Object.assign(actions, {
   },
 
   'add-idea': async ({ id }) => {
-    const res = await ask({ title: 'Новый план', fields: ideaFields() });
+    const res = await ask({ title: 'Новая задача', fields: ideaFields() });
     if (!res) return;
     const [title, text] = res;
     // Новый план — Not started, он первый в списке. Если открыт фильтр, где его не видно,
@@ -618,14 +618,14 @@ Object.assign(actions, {
 
   // С главной: сначала текст, потом раздел
   'quick-idea': async () => {
-    const res = await ask({ title: 'Новый план', fields: ideaFields() });
+    const res = await ask({ title: 'Новая задача', fields: ideaFields() });
     if (!res) return;
     const sec = await pickSection('Раздел');
     if (!sec) {
-      toast('План не сохранён — не выбран раздел');
+      toast('Задача не сохранена — не выбран раздел');
       return;
     }
-    if (await createIdea(sec, res[0], res[1])) toast(`План в разделе «${shorten(findSection(sec).name, 24)}»`);
+    if (await createIdea(sec, res[0], res[1])) toast(`Задача в разделе «${shorten(findSection(sec).name, 24)}»`);
   },
 
   'open-idea': ({ id }) => go({ name: 'idea', id }),

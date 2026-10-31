@@ -34,19 +34,19 @@ async def cmd_start(message: Message):
         await message.answer("Адрес приложения не задан: заполни WEBAPP_URL в .env.")
         return
     kb = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="Открыть планы", web_app=WebAppInfo(url=WEBAPP_URL))]]
+        inline_keyboard=[[InlineKeyboardButton(text="Открыть задачи", web_app=WebAppInfo(url=WEBAPP_URL))]]
     )
-    await message.answer("<b>Мои планы</b>", reply_markup=kb)
+    await message.answer("<b>Мои задачи</b>", reply_markup=kb)
 
 
 async def setup_menu_button(bot: Bot):
-    """Кнопка «Планы» слева от поля ввода — только в чате владельца."""
+    """Кнопка «Задачи» слева от поля ввода — только в чате владельца."""
     if not WEBAPP_URL:
         return
     try:
         await bot.set_chat_menu_button(
             chat_id=OWNER_ID,
-            menu_button=MenuButtonWebApp(text="Планы", web_app=WebAppInfo(url=WEBAPP_URL)),
+            menu_button=MenuButtonWebApp(text="Задачи", web_app=WebAppInfo(url=WEBAPP_URL)),
         )
     except Exception as e:
         logging.warning("Не удалось поставить кнопку меню: %s", e)

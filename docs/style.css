@@ -378,7 +378,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .today-bar { height: 4px; margin-top: 16px; border-radius: 2px; background: var(--field); overflow: hidden; }
 .today-bar span { display: block; height: 100%; border-radius: 2px; background: var(--fg); }
 
-/* Быстрые кнопки: идея, заметка, расход */
+/* Быстрые кнопки: задача, заметка, расход */
 .quick-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
 .btn.quick-btn {
   display: flex; align-items: center; justify-content: center; gap: 5px;
@@ -421,7 +421,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 /* Длинный список категорий в меню снизу прокручивается */
 #choice-opts { max-height: 60vh; overflow-y: auto; }
 
-/* ---------- Карточка идеи ---------- */
+/* ---------- Карточка задачи ---------- */
 .card { margin-top: 14px; padding: 18px 20px; border-radius: var(--r-block); background: var(--cell); }
 .idea-text { white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
 .idea-text.none { color: var(--faint); }
