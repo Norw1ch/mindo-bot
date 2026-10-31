@@ -349,6 +349,10 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .home-date { margin-bottom: 2px; color: var(--gray); font-size: 13px; }
 .home-label { color: var(--gray); font-size: 13px; text-transform: uppercase; letter-spacing: 0.02em; }
 
+/* Поиск по всему — пилюля */
+.home-search .search-field { height: 44px; padding: 0 16px; border-radius: 22px; background: var(--cell); color: var(--gray); }
+.home-search .search-input::placeholder { color: var(--gray); }
+
 /* Карточка «Сегодня»: три числа в ряд и прогресс привычек */
 .today-card { margin-top: 18px; padding: 20px; border-radius: 28px; background: var(--cell); }
 .today-stats { display: flex; margin-top: 14px; }

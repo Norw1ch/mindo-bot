@@ -58,10 +58,15 @@ function notesListHtml(route) {
   return `${head}<div class="page-items"><div class="group">${rows}</div></div>${pagerHtml(p)}`;
 }
 
+// Заметки, где запрос есть в заголовке или тексте
+function searchNotes(query) {
+  const q = norm(query);
+  return sortedNotes(notes.items.filter((n) => norm(n.title).includes(q) || norm(n.text || '').includes(q)));
+}
+
 function notesSearchHtml(route) {
   const query = (route.q || '').trim();
-  const q = norm(query);
-  const list = sortedNotes(notes.items.filter((n) => norm(n.title).includes(q) || norm(n.text || '').includes(q)));
+  const list = searchNotes(query);
   if (!list.length) return '<p class="empty small">Ничего не найдено</p>';
   const p = paginate(list, route);
   const rows = p.items.map((note, n) => noteRowHtml(note, n, query)).join('');

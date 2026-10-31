@@ -65,16 +65,55 @@ function tilesHtml() {
     </div>`;
 }
 
-views.home = () => `
-  <p class="home-date">${todayLine()}</p>
-  <h1>Главная</h1>
-  ${todayCardHtml()}
-  <div class="quick-btns">
-    ${quickBtnHtml('quick-idea', 'Идея')}
-    ${quickBtnHtml('quick-note', 'Заметка')}
-    ${quickBtnHtml('add-expense', 'Расход')}
-  </div>
-  ${tilesHtml()}`;
+// ---------- Поиск по всему ----------
+// Группы идут по порядку разделов: find(query) — что нашлось, row(item, query, n) — строка результата.
+// Найденное открывается здесь же, на главной: «Назад» возвращает к результатам
+
+const SEARCH_GROUPS = [
+  { label: 'Планы', find: searchIdeas, row: searchRowHtml },
+  { label: 'Заметки', find: searchNotes, row: (note, query, n) => noteRowHtml(note, n, query) },
+  { label: 'Привычки', find: searchHabits, row: habitSearchRowHtml },
+  { label: 'Расходы', find: searchExpenses, row: expenseSearchRowHtml },
+  { label: 'Списки', find: searchLists, row: listSearchRowHtml },
+];
+
+function homeSearchHtml(route) {
+  const query = (route.q || '').trim();
+  if (!query) return '';
+  const found = SEARCH_GROUPS.flatMap((g) => {
+    const items = g.find(query);
+    return items.map((item) => ({ g, item, label: `${g.label} · ${items.length}` }));
+  });
+  if (!found.length) return '<p class="empty small">Ничего не найдено</p>';
+  return groupedPage(found, route, (f) => ({ key: f.g.label, label: f.label }), (f, n) => f.g.row(f.item, query, n));
+}
+
+pagers.home = homeSearchHtml;
+
+searchHandlers.home = (route, query, inner) => {
+  const results = inner.querySelector('.search-results');
+  if (query) results.innerHTML = homeSearchHtml(route);
+  showSearchState(inner, Boolean(query));
+};
+
+views.home = (route) => {
+  // Пока в поиске есть текст — вместо обычного содержимого результаты
+  const searching = Boolean((route.q || '').trim());
+  return `
+    <p class="home-date">${todayLine()}</p>
+    <h1>Главная</h1>
+    <div class="home-search">${searchHtml(route.q, 'Поиск по всему')}</div>
+    <div class="search-results paged${searching ? '' : ' hidden'}">${searching ? homeSearchHtml(route) : ''}</div>
+    <div class="search-body${searching ? ' hidden' : ''}">
+      ${todayCardHtml()}
+      <div class="quick-btns">
+        ${quickBtnHtml('quick-idea', 'Идея')}
+        ${quickBtnHtml('quick-note', 'Заметка')}
+        ${quickBtnHtml('add-expense', 'Расход')}
+      </div>
+      ${tilesHtml()}
+    </div>`;
+};
 
 Object.assign(actions, {
   'quick-note': async () => {

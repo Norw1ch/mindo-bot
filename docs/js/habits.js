@@ -135,6 +135,24 @@ function habitInfoText(h) {
   return [h.wd ? scheduleLabel(h.wd) : '', s ? `серия ${streakText(h, s)}` : ''].filter(Boolean).join(' · ');
 }
 
+// Поиск по всему: привычки по названию
+function searchHabits(query) {
+  const q = norm(query);
+  return habits.items.filter((h) => norm(h.name).includes(q));
+}
+
+function habitSearchRowHtml(h, query) {
+  const info = habitInfoText(h);
+  return `
+    <button class="row" data-act="open-habit" data-id="${h.id}">
+      <span class="title-wrap">
+        <span class="title">${highlight(h.name, query)}</span>
+        ${info ? `<span class="subtitle">${info}</span>` : ''}
+      </span>
+      ${CHEVRON}
+    </button>`;
+}
+
 // Название, 7 точек за неделю (сегодня — последняя; дни вне графика бледнее), график и серия
 function habitInfoHtml(h) {
   const today = dayNum();

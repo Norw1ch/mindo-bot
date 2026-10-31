@@ -21,6 +21,28 @@ function listSummary(list) {
   return `осталось ${left} из ${total}`;
 }
 
+// Поиск по всему: списки, где запрос есть в названии или в пунктах. Недавние сверху
+function searchLists(query) {
+  const q = norm(query);
+  return lists.items
+    .filter((l) => norm(l.name).includes(q) || l.items.some((i) => norm(i.t).includes(q)))
+    .sort((a, b) => b.up - a.up);
+}
+
+// Нашлось только в пункте — показываем его вместо сводки
+function listSearchRowHtml(list, query) {
+  const q = norm(query);
+  const item = !norm(list.name).includes(q) && list.items.find((i) => norm(i.t).includes(q));
+  return `
+    <button class="row" data-act="open-list" data-id="${list.id}">
+      <span class="title-wrap">
+        <span class="title">${highlight(list.name, query)}</span>
+        <span class="subtitle">${item ? `☐ ${highlight(item.t, query)}` : listSummary(list)}</span>
+      </span>
+      ${CHEVRON}
+    </button>`;
+}
+
 function confirmDeleteList(id) {
   return confirmDialog(`Удалить список «${shorten(lists.find(id).name, 40)}»?`);
 }

@@ -155,6 +155,29 @@ function expenseListHtml(route) {
   }, expenseRowHtml);
 }
 
+// Поиск по всему: по категории, комментарию и сумме («1 250» найдёт 1250). Свежие сверху
+function searchExpenses(query) {
+  const q = norm(query);
+  const amount = q.replace(/\s/g, '').replace('.', ',');
+  return expenses.items
+    .filter((e) => norm(findCat(e.c).name).includes(q) || norm(e.n || '').includes(q) || amountText(e.a).includes(amount))
+    .sort((a, b) => b.t - a.t);
+}
+
+function expenseSearchRowHtml(e, query) {
+  const cat = findCat(e.c);
+  const note = e.n ? ` · ${snippet(e.n, query) || esc(e.n)}` : '';
+  return `
+    <button class="row" data-act="open-expense" data-id="${e.id}">
+      ${avatar(cat.name)}
+      <span class="title-wrap">
+        <span class="title">${highlight(cat.name, query)}</span>
+        <span class="subtitle">${dayLabel(dayKey(new Date(e.t)))}${note}</span>
+      </span>
+      <span class="meta amount">${formatMoney(e.a)}</span>
+    </button>`;
+}
+
 // Итоги по категориям: сумма и полоска для сравнения
 function catsBreakdownHtml(offset) {
   const list = monthExpenses(offset);
