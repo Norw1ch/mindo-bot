@@ -889,7 +889,6 @@ function onViewportResize() {
 }
 if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', onViewportResize);
-  window.visualViewport.addEventListener('scroll', fitSheet);
 }
 window.addEventListener('resize', onViewportResize);
 
@@ -947,7 +946,7 @@ function ask({ title, fields, date }) {
   placeSheet();
   void sheet.offsetWidth;
   sheet.classList.add('open');
-  sheetInputs[0].focus();
+  focusInPlace(sheetInputs[0]);
   return new Promise((resolve) => {
     sheetResolve = resolve;
     updateBackButton();
@@ -968,10 +967,7 @@ const SHEET_GAP = 12;        // зазор до края видимой обла
 const KEYBOARD_SHARE = 0.5;  // какую часть экрана держим свободной под клавиатуру
 
 function placeSheet() {
-  const vv = window.visualViewport;
   const visible = viewHeight();
-  sheet.style.top = `${vv ? vv.offsetTop : 0}px`;
-
   const box = sheet.querySelector('.sheet-box');
   const multi = sheetInputs.find((el) => el.dataset.multiline);
   if (multi) multi.style.maxHeight = '';
@@ -991,6 +987,47 @@ function fitSheet() {
   if (sheet.classList.contains('open') && !sheet.classList.contains('closing')) placeSheet();
 }
 
+// ---------- iPhone не должен двигать страницу, пока открыто окно ввода ----------
+// При нажатии на поле iPhone сам прокручивает страницу, чтобы показать его. Окно и так стоит над
+// клавиатурой, а эта прокрутка дёргает экран и уводит курсор с поля. Поэтому фокус ставим сами:
+// на миг уводим поле далеко вверх, туда прокручивать незачем, и возвращаем до отрисовки кадра
+const FOCUS_TRICK = 'translateY(-2000px)';
+const TAP_SLOP = 10; // палец сдвинулся дальше — это уже не нажатие, а прокрутка текста в поле
+let sheetTap = null;
+
+function focusInPlace(el) {
+  el.style.transform = FOCUS_TRICK;
+  el.focus({ preventScroll: true });
+  el.setSelectionRange(el.value.length, el.value.length);
+  requestAnimationFrame(() => { el.style.transform = ''; });
+}
+
+sheetFields.addEventListener('touchstart', (e) => {
+  const touch = e.touches[0];
+  sheetTap = { x: touch.clientX, y: touch.clientY };
+}, { passive: true });
+
+sheetFields.addEventListener('touchmove', (e) => {
+  const touch = e.touches[0];
+  if (sheetTap && Math.hypot(touch.clientX - sheetTap.x, touch.clientY - sheetTap.y) > TAP_SLOP) sheetTap = null;
+}, { passive: true });
+
+sheetFields.addEventListener('touchend', (e) => {
+  const el = e.target;
+  // Нажатие по уже активному полю оставляем телефону: так ставят курсор внутри текста
+  if (!sheetTap || !sheetInputs.includes(el) || el === document.activeElement) return;
+  e.preventDefault(); // без этого телефон сам поставит фокус и прокрутит страницу
+  closeDatePop();
+  focusInPlace(el);
+});
+
+// Запасной вариант: если страница всё же сдвинулась — сразу возвращаем на место
+function holdPage() {
+  if (sheetResolve && (window.scrollY || (window.visualViewport && window.visualViewport.offsetTop))) window.scrollTo(0, 0);
+}
+window.addEventListener('scroll', holdPage);
+if (window.visualViewport) window.visualViewport.addEventListener('scroll', holdPage);
+
 // Enter в однострочном поле — к следующему полю или сохранить; Ctrl+Enter — сохранить всегда
 function onSheetKey(e) {
   if (e.key !== 'Enter') return;
@@ -999,7 +1036,7 @@ function onSheetKey(e) {
   if (el.dataset.multiline && !force) return; // обычный перенос строки
   e.preventDefault();
   const next = sheetInputs[sheetInputs.indexOf(el) + 1];
-  if (next && !force) next.focus();
+  if (next && !force) focusInPlace(next);
   else saveSheet();
 }
 
@@ -1008,10 +1045,7 @@ function closeSheet(result) {
   sheet.classList.add('closing'); // окно плавно уменьшается и исчезает
   sheetInputs.forEach((el) => el.blur());
   releaseTabbar('sheet');
-  sheetTimer = setTimeout(() => {
-    sheet.classList.remove('open', 'closing');
-    sheet.style.top = ''; // окно спрятано — возвращаем его на обычное место
-  }, 260);
+  sheetTimer = setTimeout(() => sheet.classList.remove('open', 'closing'), 260);
   const resolve = sheetResolve;
   sheetResolve = null;
   updateBackButton();
@@ -1026,7 +1060,7 @@ function saveSheet() {
   const missing = sheetInputs.find((el, i) => !el.dataset.optional && !values[i]);
   if (missing) {
     toast('Пусто');
-    missing.focus();
+    focusInPlace(missing);
     return;
   }
   // Проверка значений (например, что сумма — это число)
@@ -1034,7 +1068,7 @@ function saveSheet() {
     const problem = sheetInputs[i].check && values[i] && sheetInputs[i].check(values[i]);
     if (problem) {
       toast(problem);
-      sheetInputs[i].focus();
+      focusInPlace(sheetInputs[i]);
       return;
     }
   }
