@@ -27,6 +27,8 @@
 
   --gray: #8e8e93;          /* подписи: вкладки и главная */
   --dash: #c7c7cc;          /* пунктирная рамка */
+  --total-from: #ffffff;    /* карточка итога расходов: перелив слева направо */
+  --total-to: #e9e9ee;
 
   --ease: cubic-bezier(.32, .72, 0, 1);
   --soft: cubic-bezier(.2, .9, .3, 1);
@@ -48,6 +50,8 @@
   --backdrop: rgba(0, 0, 0, 0.5);
   --bar: rgba(22, 22, 22, 0.94);
   --dash: #3a3a3c;
+  --total-from: #252527;
+  --total-to: #3a3a3c;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -419,9 +423,45 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .cat-bar { display: block; height: 4px; margin-top: 6px; border-radius: 2px; background: var(--field); overflow: hidden; }
 .cat-bar span { display: block; height: 100%; border-radius: 2px; background: var(--muted); }
 
-.total-card { margin-top: 18px; padding: 12px 12px 18px; border-radius: var(--r-block); background: var(--cell); text-align: center; }
-.total-sum { display: block; margin-top: 6px; font-size: 36px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.total-sub { color: var(--muted); font-size: 14px; }
+/* Лента периодов: заходит под поля экрана и листается в сторону */
+.chips {
+  position: relative; display: flex; gap: 8px; margin: 14px -16px 0; padding: 0 16px;
+  overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+}
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex: none; display: flex; align-items: center; gap: 6px;
+  height: 44px; padding: 0 16px; border-radius: 22px;
+  background: var(--cell); font-size: 15px; font-weight: 600; white-space: nowrap;
+  transition: background-color .25s ease, color .25s ease, transform .25s var(--soft);
+}
+.chip:active { transform: scale(0.96); transition-duration: .1s; }
+.chip.active { background: var(--inv-bg); color: var(--inv-fg); }
+.chip svg { flex: none; width: 17px; height: 17px; }
+
+/* Две даты своего периода */
+.range-card {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 12px; padding: 10px; border-radius: var(--r-block); background: var(--cell);
+}
+.range-card .date-pill { flex: 1; min-width: 0; height: 44px; padding: 0 6px; white-space: nowrap; }
+.range-card .date-pill:active { opacity: 0.6; transition-duration: .1s; }
+.range-dash { flex: none; color: var(--gray); }
+@media (max-width: 350px) { .range-card .date-pill { font-size: 13px; } }
+
+/* Итог периода */
+.total-card {
+  margin-top: 14px; padding: 22px; border-radius: var(--r-block);
+  background: linear-gradient(120deg, var(--total-from), var(--total-to));
+}
+.total-head { color: var(--muted); font-size: 15px; font-weight: 600; }
+.total-sum {
+  display: block; margin-top: 8px; font-size: 44px; font-weight: 700; line-height: 52px;
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.total-sum.long { font-size: 34px; }
+.total-sum.longer { font-size: 27px; }
+.total-sub { display: block; margin-top: 6px; color: var(--muted); font-size: 15px; }
 
 /* Длинный список категорий в меню снизу прокручивается */
 #choice-opts { max-height: 60vh; overflow-y: auto; }
@@ -544,15 +584,17 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .date-pill { padding: 6px 12px; border-radius: 999px; background: var(--field); font-size: 15px; transition: opacity .2s ease; }
 .sheet-date:active .date-pill { opacity: 0.6; transition-duration: .1s; }
 
-/* Календарь поверх окна ввода */
+/* Календарь поверх окна ввода или экрана */
+.date-shade { position: fixed; inset: 0; z-index: 11; display: none; }
+.date-shade.open { display: block; }
 .date-pop {
-  position: absolute; z-index: 1; top: 0; left: 20px; right: 20px;
+  position: fixed; z-index: 12; top: 0; left: 20px; right: 20px;
   max-width: 400px; margin: 0 auto; padding: 14px 0; border-radius: var(--r-block);
   border: 0.5px solid var(--sep);
   background: var(--sheet);
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
-  opacity: 0; visibility: hidden; transform: scale(0.92); transform-origin: top right;
+  opacity: 0; visibility: hidden; transform: scale(0.92); transform-origin: top center;
   transition: opacity .2s ease, transform .2s ease, visibility 0s linear .2s;
 }
 /* top меняется плавно — когда клавиатура уезжает и окно опускается на место */

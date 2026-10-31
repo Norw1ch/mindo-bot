@@ -243,7 +243,7 @@ const EDGE_FLICK = 0.5;     // скорость (пикселей в мс), пр
 let edge = null;
 
 function edgeAllowed() {
-  return stack.length > 1 && !busy && !sheetResolve && !choiceResolve;
+  return stack.length > 1 && !busy && !sheetResolve && !choiceResolve && !datePopShown;
 }
 
 document.addEventListener('touchstart', (e) => {
@@ -590,9 +590,18 @@ function flushAllEdits() {
   [...editTimers.keys()].forEach((el) => flushEdit(el, true));
 }
 
-// Подогнать высоту полей под текст (после того, как экран попал на страницу)
+// Выбранная пилюля — по центру ленты, насколько позволяют её края
+function centerChip(chips, smooth) {
+  const chip = chips.querySelector('.chip.active');
+  const left = chip.offsetLeft - (chips.clientWidth - chip.offsetWidth) / 2;
+  chips.scrollTo({ left, behavior: smooth && !reduceMotion ? 'smooth' : 'auto' });
+}
+
+// То, что зависит от размеров: поля под текст, лента под выбранную пилюлю
+// (после того, как экран попал на страницу)
 function sizeEdits(screen) {
   screen.querySelectorAll('.inline-edit').forEach(autoGrow);
+  screen.querySelectorAll('.chips').forEach((chips) => centerChip(chips));
 }
 
 document.addEventListener('input', (e) => {
@@ -1005,7 +1014,7 @@ function placeSheet() {
     if (still > 0 && multi) multi.style.maxHeight = `${Math.max(64, multi.offsetHeight - still)}px`;
   }
   sheet.style.paddingTop = `${sheetPad}px`;
-  if (datePopShown) placeDatePop(sheetPad, visible);
+  if (datePopShown) placeDatePop();
 }
 
 function fitSheet() {
@@ -1106,23 +1115,25 @@ sheet.addEventListener('click', (e) => {
   // Строка «Дата» открывает и закрывает календарь; нажатие мимо открытого календаря — закрывает его
   if (e.target.closest('.sheet-date')) {
     if (datePopShown) closeDatePop();
-    else openDatePop();
+    else pickSheetDate();
   } else if (datePopShown) {
-    if (!e.target.closest('.date-pop')) closeDatePop();
+    closeDatePop();
   } else if (e.target === sheet) {
     closeSheet(null); // нажатие на затемнённый фон — отмена
   }
 });
 
-// ---------- Выбор даты в окне ввода ----------
-// Календарь поверх окна. Листается так же, как календарь привычек: стрелками и свайпом.
-// Будущие дни недоступны
+// ---------- Выбор даты ----------
+// Календарь поверх окна ввода или экрана. Листается так же, как календарь привычек: стрелками
+// и свайпом. Будущие дни недоступны
 
 const datePop = document.getElementById('date-pop');
-const DATE_POP_GAP = 8;      // зазор между строкой «Дата» и календарём
+const dateShade = document.getElementById('date-shade'); // на экране ловит нажатие мимо календаря
+const DATE_POP_GAP = 8;      // зазор между строкой с датой и календарём
 const DATE_PICK_PAUSE = 220; // чтобы успеть увидеть выбранный день, прежде чем календарь закроется
 let datePopTimer;
 let datePopShown = false;
+let datePick = null; // что выбираем сейчас: { value, anchor, onPick(key) }
 
 function dateField(key) {
   const el = document.createElement('button');
@@ -1153,18 +1164,19 @@ function datePopHtml(src) {
     <div class="cal-viewport"><div class="cal-grid">${src.cells(src.month)}</div></div>`;
 }
 
-function openDatePop() {
+function openDatePop(pick) {
   clearTimeout(datePopTimer);
-  sheetInputs.forEach((el) => el.blur()); // клавиатура закрыла бы календарь
+  datePick = pick;
   datePop.source = {
-    month: monthOffset(sheetDate.value),
-    cells: (month) => dateCellsHtml(month, sheetDate.value),
+    month: monthOffset(pick.value),
+    cells: (month) => dateCellsHtml(month, datePick.value),
   };
   datePop.innerHTML = datePopHtml(datePop.source);
   datePopShown = true;
-  fitSheet();
+  placeDatePop();
   void datePop.offsetWidth; // сначала встаём на место, потом проявляемся — иначе календарь прилетел бы сверху
   datePop.classList.add('open');
+  dateShade.classList.toggle('open', !sheetResolve); // в окне ввода нажатия ловит само окно
 }
 
 function closeDatePop() {
@@ -1173,15 +1185,30 @@ function closeDatePop() {
   datePopShown = false;
   calFinishRunning(datePop);
   datePop.classList.remove('open');
+  dateShade.classList.remove('open');
 }
 
-// Календарь стоит под строкой «Дата», а если не помещается — выше, в пределах видимой области
-function placeDatePop(pad, visible) {
-  const boxTop = sheet.querySelector('.sheet-box').getBoundingClientRect().top;
-  const under = pad + sheetDate.getBoundingClientRect().bottom - boxTop + DATE_POP_GAP;
-  const lowest = visible - datePop.offsetHeight - SHEET_GAP;
+// Строка «Дата» в окне ввода
+function pickSheetDate() {
+  sheetInputs.forEach((el) => el.blur()); // клавиатура закрыла бы календарь
+  openDatePop({
+    value: sheetDate.value,
+    anchor: sheetDate,
+    onPick: (key) => {
+      sheetDate.value = key;
+      setText(sheetDate.querySelector('.date-pill'), fullDate(key));
+    },
+  });
+}
+
+// Календарь стоит под строкой с датой, а если не помещается — выше, в пределах видимой области
+function placeDatePop() {
+  const under = datePick.anchor.getBoundingClientRect().bottom + DATE_POP_GAP;
+  const lowest = viewHeight() - datePop.offsetHeight - SHEET_GAP;
   datePop.style.top = `${Math.max(SHEET_GAP, Math.min(under, lowest))}px`;
 }
+
+dateShade.addEventListener('click', closeDatePop);
 
 datePop.addEventListener('click', (e) => {
   const arrow = e.target.closest('[data-dir]');
@@ -1190,8 +1217,8 @@ datePop.addEventListener('click', (e) => {
   if (!day) return;
   datePop.querySelectorAll('.cal-day.done').forEach((el) => el.classList.remove('done'));
   day.classList.add('done', 'just');
-  sheetDate.value = day.dataset.key;
-  setText(sheetDate.querySelector('.date-pill'), fullDate(day.dataset.key));
+  datePick.value = day.dataset.key;
+  datePick.onPick(day.dataset.key);
   softHaptic();
   clearTimeout(datePopTimer);
   datePopTimer = setTimeout(closeDatePop, DATE_PICK_PAUSE);

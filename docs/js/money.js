@@ -76,17 +76,80 @@ function amountText(kop) {
   return String(kop / 100).replace('.', lang === 'en' ? '.' : ',');
 }
 
+// ---------- Периоды ----------
+// route.period — ключ из PERIODS (по умолчанию этот месяц). Свой период: route.from и route.to —
+// первый и последний день включительно
+
+const PERIODS = [
+  { key: 'month', label: 'Этот месяц', head: 'В этом месяце вы потратили' },
+  { key: 'last', label: 'Прошлый месяц', head: 'В прошлом месяце вы потратили' },
+  { key: 'week', label: '7 дней', head: 'За 7 дней вы потратили' },
+  { key: 'yesterday', label: 'Вчера', head: 'Вчера вы потратили' },
+  { key: 'today', label: 'Сегодня', head: 'Сегодня вы потратили' },
+  { key: 'all', label: 'Всё время', head: 'За всё время вы потратили' },
+  { key: 'custom', label: 'Свой период', head: 'За выбранный период вы потратили' },
+];
+
+function periodOf(route) {
+  return PERIODS.find((p) => p.key === route.period) || PERIODS[0];
+}
+
 // Границы месяца: offset — сдвиг от текущего (0 — этот, -1 — прошлый)
 function monthRange(offset = 0) {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth() + offset, 1);
   const end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 1);
-  return { start: start.getTime(), end: end.getTime(), title: monthTitle(start) };
+  return { start: start.getTime(), end: end.getTime() };
 }
 
-// Расходы месяца (и категории, если задана), свежие сверху
-function monthExpenses(offset, catId) {
-  const { start, end } = monthRange(offset);
+// Свой период; пока даты не выбраны — с начала месяца по сегодня
+function customRange(route) {
+  const today = dayKey();
+  return { from: route.from || `${today.slice(0, 8)}01`, to: route.to || today };
+}
+
+function periodRange(route) {
+  const today = dayKey();
+  const dayStart = (key, shift = 0) => keyToDate(addDays(key, shift)).getTime();
+  const { from, to } = customRange(route);
+  return {
+    month: () => monthRange(0),
+    last: () => monthRange(-1),
+    week: () => ({ start: dayStart(today, -6), end: dayStart(today, 1) }),
+    yesterday: () => ({ start: dayStart(today, -1), end: dayStart(today) }),
+    today: () => ({ start: dayStart(today), end: dayStart(today, 1) }),
+    all: () => ({ start: 0, end: Infinity }),
+    custom: () => ({ start: dayStart(from), end: dayStart(to, 1) }),
+  }[periodOf(route).key]();
+}
+
+// Подпись периода: «Этот месяц» или «14 окт. 2026 г. — 31 окт. 2026 г.»
+function periodName(route) {
+  const period = periodOf(route);
+  if (period.key !== 'custom') return t(period.label);
+  const { from, to } = customRange(route);
+  return `${fullDate(from)} — ${fullDate(to)}`;
+}
+
+// Новый расход должен быть виден: не попал в выбранный период — показываем его месяц
+function showExpenseDay(route, day) {
+  const time = keyToDate(day).setHours(12);
+  const { start, end } = periodRange(route);
+  if (time >= start && time < end) return;
+  const offset = monthOffset(day);
+  if (offset === 0 || offset === -1) {
+    route.period = offset ? 'last' : 'month';
+    return;
+  }
+  const first = new Date(time);
+  first.setDate(1);
+  const last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
+  Object.assign(route, { period: 'custom', from: dayKey(first), to: dayKey(last) });
+}
+
+// Расходы периода (и категории, если задана), свежие сверху
+function periodExpenses(route, catId) {
+  const { start, end } = periodRange(route);
   return expenses.items
     .filter((e) => e.t >= start && e.t < end && (!catId || findCat(e.c).id === catId))
     .sort((a, b) => b.t - a.t);
@@ -108,7 +171,7 @@ function confirmDeleteExpense(id) {
 }
 
 function deleteExpenseData(id) {
-  flash = 'total'; // итог месяца сменится мягко
+  flash = 'total'; // итог периода сменится мягко
   expenses.items = expenses.items.filter((e) => e.id !== id);
   return expenses.save();
 }
@@ -156,7 +219,7 @@ function expenseRowHtml(e, n) {
 
 // Расходы по дням с листанием. route.catId — только одна категория
 function expenseListHtml(route) {
-  const list = monthExpenses(route.month || 0, route.catId);
+  const list = periodExpenses(route, route.catId);
   if (!list.length) return `<p class="empty small">${t('Расходов пока нет')}</p>`;
   return groupedPage(list, route, (e) => {
     const key = dayKey(new Date(e.t));
@@ -188,8 +251,8 @@ function expenseSearchRowHtml(e, query) {
 }
 
 // Итоги по категориям: сумма и полоска для сравнения
-function catsBreakdownHtml(offset) {
-  const list = monthExpenses(offset);
+function catsBreakdownHtml(route) {
+  const list = periodExpenses(route);
   const byCat = new Map();
   list.forEach((e) => {
     const id = findCat(e.c).id;
@@ -215,22 +278,40 @@ function catsBreakdownHtml(offset) {
     }).join('')}</div>`;
 }
 
-// Карточка месяца: «‹ Октябрь 2026 ›», итог, по категориям, список
-function monthHtml(route) {
-  const offset = route.month || 0;
-  const list = monthExpenses(offset);
+// Лента периодов: все не влезают в ширину экрана, она листается в сторону
+function chipsHtml(route) {
+  const active = periodOf(route).key;
+  const calendar = icon('<rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8.5 3v4M15.5 3v4M4 10h16"/>');
+  return `
+    <div class="chips">${PERIODS.map((p) => `
+      <button class="chip${p.key === active ? ' active' : ''}" data-act="set-period" data-key="${p.key}">
+        ${p.key === 'custom' ? calendar : ''}${t(p.label)}
+      </button>`).join('')}
+    </div>`;
+}
+
+// Две даты своего периода: с какого дня и по какой
+function rangeHtml(route) {
+  const { from, to } = customRange(route);
+  return `
+    <button class="date-pill" data-act="pick-range" data-end="from">${fullDate(from)}</button>
+    <span class="range-dash">—</span>
+    <button class="date-pill" data-act="pick-range" data-end="to">${fullDate(to)}</button>`;
+}
+
+// Итог периода, по категориям, список
+function periodHtml(route) {
+  const list = periodExpenses(route);
+  const total = formatMoney(sum(list));
+  const size = total.length > 13 ? ' longer' : total.length > 9 ? ' long' : '';
   return `
     <div class="page-items">
       <div class="total-card">
-        <div class="cal-head">
-          <button class="pager-btn prev" data-act="money-month" data-dir="-1">${CHEVRON}</button>
-          <span class="cal-title">${monthRange(offset).title}</span>
-          <button class="pager-btn" data-act="money-month" data-dir="1"${offset >= 0 ? ' disabled' : ''}>${CHEVRON}</button>
-        </div>
-        <b class="total-sum${takeFlash('total') ? ' swap' : ''}">${formatMoney(sum(list))}</b>
+        <p class="total-head">${t(periodOf(route).head)}</p>
+        <b class="total-sum${size}${takeFlash('total') ? ' swap' : ''}">${total}</b>
         <span class="total-sub">${list.length ? plural(list.length, ['расход', 'расхода', 'расходов']) : t('Расходов нет')}</span>
       </div>
-      ${catsBreakdownHtml(offset)}
+      ${catsBreakdownHtml(route)}
       ${list.length ? `<p class="group-head">${t('Расходы')}</p>` : ''}
       <div class="paged">${list.length ? expenseListHtml(route) : ''}</div>
     </div>`;
@@ -246,18 +327,20 @@ views.money = (route) => `
   <div class="actions">
     <button class="btn primary" data-act="add-expense">➕ ${t('Добавить расход')}</button>
   </div>
-  <div class="month-box paged">${monthHtml(route)}</div>
+  ${chipsHtml(route)}
+  <div class="range-card${periodOf(route).key === 'custom' ? '' : ' hidden'}">${rangeHtml(route)}</div>
+  <div class="month-box paged">${periodHtml(route)}</div>
   <div class="group">
     <button class="row" data-act="open-mcats"><span class="title">${t('Категории')}</span><span class="meta">${mcats.length}</span>${CHEVRON}</button>
   </div>`;
 
-// Расходы одной категории за выбранный месяц
+// Расходы одной категории за выбранный период
 views.mcat = (route) => {
   const cat = findCat(route.catId);
-  const list = monthExpenses(route.month || 0, cat.id);
+  const list = periodExpenses(route, cat.id);
   return `
     <h1>${esc(cat.name)}</h1>
-    <p class="sub">${monthRange(route.month || 0).title} · ${formatMoney(sum(list))}</p>
+    <p class="sub">${periodName(route)} · ${formatMoney(sum(list))}</p>
     <div class="paged">${expenseListHtml(route)}</div>`;
 };
 
@@ -381,7 +464,7 @@ Object.assign(actions, {
     const expense = { id: newId(), a: parseAmount(res[0]), c: catId, t: time, n: res[1] };
     flash = new Set([expense.id, 'total']); // новая строка появляется, итог мягко меняется
     const route = currentRoute();
-    route.month = monthOffset(day); // показываем месяц, в который попал расход
+    showExpenseDay(route, day);
     route.page = 0;
     const ok = await commit(() => {
       expenses.items.push(expense);
@@ -390,15 +473,49 @@ Object.assign(actions, {
     if (ok) toast(`${formatMoney(expense.a)} · ${findCat(catId).name}`);
   },
 
-  'money-month': ({ dir }, el) => {
+  // Лента периодов: пилюля и список меняются на месте, лента не прыгает к началу.
+  // Новый итог въезжает с той стороны, куда переключили
+  'set-period': ({ key }, el) => {
     const route = currentRoute();
-    route.month = (route.month || 0) + Number(dir);
+    const order = PERIODS.map((p) => p.key);
+    const from = order.indexOf(periodOf(route).key);
+    const to = order.indexOf(key);
+    if (from === to) return;
+    route.period = key;
     route.page = 0;
-    swapContent(el.closest('.month-box'), monthHtml(route), Number(dir) > 0 ? 'page-next' : 'page-prev');
+    const chips = el.closest('.chips');
+    chips.querySelectorAll('.chip').forEach((chip) => chip.classList.toggle('active', chip === el));
+    centerChip(chips, true);
+    const inner = el.closest('.screen-inner');
+    revealBlock(inner.querySelector('.range-card'), key === 'custom');
+    swapContent(inner.querySelector('.month-box'), periodHtml(route), to > from ? 'page-next' : 'page-prev');
     softHaptic();
   },
 
-  'open-mcat': ({ id }) => go({ name: 'mcat', catId: id, month: currentRoute().month || 0 }),
+  // Дата своего периода. Начало не может быть позже конца: вторая дата подтягивается следом
+  'pick-range': ({ end }, el) => {
+    const route = currentRoute();
+    const range = customRange(route);
+    const card = el.closest('.range-card');
+    openDatePop({
+      value: range[end],
+      anchor: el,
+      onPick: (key) => {
+        range[end] = key;
+        if (range.from > range.to) range[end === 'from' ? 'to' : 'from'] = key;
+        Object.assign(route, range, { page: 0 });
+        const [fromPill, toPill] = card.querySelectorAll('.date-pill');
+        setText(fromPill, fullDate(range.from));
+        setText(toPill, fullDate(range.to));
+        swapContent(card.closest('.screen-inner').querySelector('.month-box'), periodHtml(route), 'list-swap');
+      },
+    });
+  },
+
+  'open-mcat': ({ id }) => {
+    const { period, from, to } = currentRoute();
+    go({ name: 'mcat', catId: id, period, from, to });
+  },
   'open-expense': ({ id }) => go({ name: 'expense', id }),
   'open-mcats': () => go({ name: 'mcats' }),
 
