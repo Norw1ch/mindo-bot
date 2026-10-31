@@ -462,6 +462,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .total-sum.long { font-size: 34px; }
 .total-sum.longer { font-size: 27px; }
 .total-sub { display: block; margin-top: 6px; color: var(--muted); font-size: 15px; }
+.actions.total-action { margin-top: 12px; }
 
 /* Длинный список категорий в меню снизу прокручивается */
 #choice-opts { max-height: 60vh; overflow-y: auto; }

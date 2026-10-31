@@ -299,22 +299,34 @@ function rangeHtml(route) {
     <button class="date-pill" data-act="pick-range" data-end="to">${fullDate(to)}</button>`;
 }
 
-// Итог периода, по категориям, список
-function periodHtml(route) {
+// Карточка итога периода
+function totalHtml(route) {
   const list = periodExpenses(route);
   const total = formatMoney(sum(list));
   const size = total.length > 13 ? ' longer' : total.length > 9 ? ' long' : '';
   return `
+    <div class="total-card">
+      <p class="total-head">${t(periodOf(route).head)}</p>
+      <b class="total-sum${size}${takeFlash('total') ? ' swap' : ''}">${total}</b>
+      <span class="total-sub">${list.length ? plural(list.length, ['расход', 'расхода', 'расходов']) : t('Расходов нет')}</span>
+    </div>`;
+}
+
+// По категориям и список за период
+function periodHtml(route) {
+  const list = periodExpenses(route);
+  return `
     <div class="page-items">
-      <div class="total-card">
-        <p class="total-head">${t(periodOf(route).head)}</p>
-        <b class="total-sum${size}${takeFlash('total') ? ' swap' : ''}">${total}</b>
-        <span class="total-sub">${list.length ? plural(list.length, ['расход', 'расхода', 'расходов']) : t('Расходов нет')}</span>
-      </div>
       ${catsBreakdownHtml(route)}
       ${list.length ? `<p class="group-head">${t('Расходы')}</p>` : ''}
       <div class="paged">${list.length ? expenseListHtml(route) : ''}</div>
     </div>`;
+}
+
+// Период сменился: итог и списки меняются мягко, кнопка между ними стоит на месте
+function swapPeriod(inner, route, cls) {
+  swapContent(inner.querySelector('.total-box'), totalHtml(route), cls);
+  swapContent(inner.querySelector('.month-box'), periodHtml(route), cls);
 }
 
 pagers.money = expenseListHtml;
@@ -324,11 +336,12 @@ pagers.mcat = expenseListHtml;
 
 views.money = (route) => `
   <h1>${t('Расходы')}</h1>
-  <div class="actions">
-    <button class="btn primary" data-act="add-expense">➕ ${t('Добавить расход')}</button>
-  </div>
   ${chipsHtml(route)}
   <div class="range-card${periodOf(route).key === 'custom' ? '' : ' hidden'}">${rangeHtml(route)}</div>
+  <div class="total-box paged">${totalHtml(route)}</div>
+  <div class="actions total-action">
+    <button class="btn primary" data-act="add-expense">➕ ${t('Добавить расход')}</button>
+  </div>
   <div class="month-box paged">${periodHtml(route)}</div>
   <div class="group">
     <button class="row" data-act="open-mcats"><span class="title">${t('Категории')}</span><span class="meta">${mcats.length}</span>${CHEVRON}</button>
@@ -488,7 +501,7 @@ Object.assign(actions, {
     centerChip(chips, true);
     const inner = el.closest('.screen-inner');
     revealBlock(inner.querySelector('.range-card'), key === 'custom');
-    swapContent(inner.querySelector('.month-box'), periodHtml(route), to > from ? 'page-next' : 'page-prev');
+    swapPeriod(inner, route, to > from ? 'page-next' : 'page-prev');
     softHaptic();
   },
 
@@ -507,7 +520,7 @@ Object.assign(actions, {
         const [fromPill, toPill] = card.querySelectorAll('.date-pill');
         setText(fromPill, fullDate(range.from));
         setText(toPill, fullDate(range.to));
-        swapContent(card.closest('.screen-inner').querySelector('.month-box'), periodHtml(route), 'list-swap');
+        swapPeriod(card.closest('.screen-inner'), route, 'list-swap');
       },
     });
   },
