@@ -162,7 +162,7 @@ Object.assign(actions, {
     const note = { id: newId(), title, text, pin: false, at: now, up: now };
     flash = note.id;
     currentRoute().page = 0; // новая — первая в списке
-    await commit(() => {
+    return commit(() => {
       notes.items.push(note);
       return notes.save();
     });

@@ -547,20 +547,44 @@ function ideaFields(idea = { title: '', text: '' }) {
   ];
 }
 
+// Новый раздел: спросить название, сохранить, вернуть его id (или null при отмене)
+async function createSection() {
+  const res = await ask({ title: 'Новый раздел', fields: [{ placeholder: 'Название', max: SECTION_MAX }] });
+  if (!res) return null;
+  const [name] = res;
+  const id = newId();
+  flash = id;
+  const ok = await commit(() => {
+    data.sections.push({ id, name });
+    return saveSections();
+  });
+  return ok ? id : null;
+}
+
+// Выбор раздела в меню снизу; внизу — «Новый раздел…». Разделов нет — сразу создаём первый
+async function pickSection(title) {
+  if (!data.sections.length) return createSection();
+  const options = data.sections.map((s) => ({ key: s.id, label: s.name }));
+  options.push({ key: '__new', label: '＋ Новый раздел…' });
+  const picked = await choose({ title, options });
+  if (picked === '__new') return createSection();
+  return picked;
+}
+
+// Новый план (Not started) в разделе. Возвращает true, если сохранился
+function createIdea(sec, title, text) {
+  const idea = { id: newId(), sec, title, text, st: 'new', at: Date.now() };
+  flash = idea.id;
+  return commit(() => {
+    data.ideas.push(idea);
+    return saveIdea(idea);
+  });
+}
+
 Object.assign(actions, {
   'open-section': ({ id }) => go({ name: 'section', id }),
 
-  'new-section': async () => {
-    const res = await ask({ title: 'Новый раздел', fields: [{ placeholder: 'Название', max: SECTION_MAX }] });
-    if (!res) return;
-    const [name] = res;
-    const id = newId();
-    flash = id;
-    await commit(() => {
-      data.sections.push({ id, name });
-      return saveSections();
-    });
-  },
+  'new-section': () => createSection(),
 
   'rename-section': async ({ id }) => {
     const s = findSection(id);
@@ -584,17 +608,24 @@ Object.assign(actions, {
     const res = await ask({ title: 'Новый план', fields: ideaFields() });
     if (!res) return;
     const [title, text] = res;
-    const idea = { id: newId(), sec: id, title, text, st: 'new', at: Date.now() };
-    flash = idea.id;
     // Новый план — Not started, он первый в списке. Если открыт фильтр, где его не видно,
     // переключаемся на «Все»; в любом случае — на первую страницу
     const route = currentRoute();
     if (route.filter === 'wip' || route.filter === 'done') route.filter = 'all';
     route.page = 0;
-    await commit(() => {
-      data.ideas.push(idea);
-      return saveIdea(idea);
-    });
+    await createIdea(id, title, text);
+  },
+
+  // С главной: сначала текст, потом раздел
+  'quick-idea': async () => {
+    const res = await ask({ title: 'Новый план', fields: ideaFields() });
+    if (!res) return;
+    const sec = await pickSection('Раздел');
+    if (!sec) {
+      toast('План не сохранён — не выбран раздел');
+      return;
+    }
+    if (await createIdea(sec, res[0], res[1])) toast(`План в разделе «${shorten(findSection(sec).name, 24)}»`);
   },
 
   'open-idea': ({ id }) => go({ name: 'idea', id }),
