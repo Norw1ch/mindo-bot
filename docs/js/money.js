@@ -87,6 +87,12 @@ function sum(list) {
   return list.reduce((s, e) => s + e.a, 0);
 }
 
+// Сумма расходов за сегодня, в копейках
+function todaySpent() {
+  const today = dayKey();
+  return sum(expenses.items.filter((e) => dayKey(new Date(e.t)) === today));
+}
+
 function confirmDeleteExpense(id) {
   const e = expenses.find(id);
   return confirmDialog(`Удалить расход ${formatMoney(e.a)} (${findCat(e.c).name})?`);

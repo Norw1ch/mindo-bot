@@ -346,6 +346,26 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 /* ---------- Главная ---------- */
 .home-date { margin-bottom: 2px; color: var(--gray); font-size: 13px; }
 
+/* Карточка «Сегодня»: три числа в ряд и прогресс привычек */
+.today-card { margin-top: 18px; padding: 20px; border-radius: 28px; background: var(--cell); }
+.today-head { color: var(--gray); font-size: 13px; text-transform: uppercase; letter-spacing: 0.02em; }
+.today-stats { display: flex; margin-top: 14px; }
+.today-stat { flex: 1 1 auto; min-width: 0; padding: 0 10px; text-align: center; }
+.today-stat:first-child { padding-left: 0; }
+.today-stat:last-child { padding-right: 0; }
+.today-stat + .today-stat { border-left: 0.5px solid var(--sep); }
+/* Высота строки постоянная: у мелкой суммы подписи остаются на одном уровне с соседними */
+.today-stat b { display: block; font-size: 26px; font-weight: 700; line-height: 32px; white-space: nowrap; }
+.today-stat b.long { font-size: 20px; }
+.today-stat b.longer { font-size: 16px; }
+.today-stat span { display: block; margin-top: 2px; color: var(--gray); font-size: 13px; white-space: nowrap; }
+@media (max-width: 350px) {
+  .today-stat { padding: 0 6px; }
+  .today-stat b.longer { font-size: 14px; }
+}
+.today-bar { height: 4px; margin-top: 16px; border-radius: 2px; background: var(--field); overflow: hidden; }
+.today-bar span { display: block; height: 100%; border-radius: 2px; background: var(--fg); }
+
 /* ---------- Расходы ---------- */
 /* Серый кружок с первой буквой категории */
 .avatar {

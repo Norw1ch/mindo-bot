@@ -114,14 +114,19 @@ function daysWord(n) {
   return plural(n, ['день', 'дня', 'дней']);
 }
 
-// «Сегодня: 2 из 5» — считаем только привычки, запланированные на сегодня
-function habitsSummary() {
-  if (!habits.items.length) return 'Привычек пока нет';
+// Привычки, запланированные на сегодня: сколько выполнено и сколько всего
+function habitsToday() {
   const today = dayNum();
   const planned = habits.items.filter((h) => isScheduled(h, today));
-  if (!planned.length) return 'Сегодня по графику ничего';
-  const done = planned.filter((h) => isDone(h, today)).length;
-  return `Сегодня: ${done} из ${planned.length}`;
+  return { done: planned.filter((h) => isDone(h, today)).length, total: planned.length };
+}
+
+// «Сегодня: 2 из 5»
+function habitsSummary() {
+  if (!habits.items.length) return 'Привычек пока нет';
+  const { done, total } = habitsToday();
+  if (!total) return 'Сегодня по графику ничего';
+  return `Сегодня: ${done} из ${total}`;
 }
 
 // Подпись под названием: график и серия — «Пн, Ср, Пт · серия 3»

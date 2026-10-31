@@ -52,6 +52,11 @@ function findSection(id) {
   return data.sections.find((s) => s.id === id);
 }
 
+// Сколько планов в работе (In progress) во всех разделах
+function wipCount() {
+  return data.ideas.filter((i) => i.st === 'wip' && findSection(i.sec)).length;
+}
+
 function findIdea(id) {
   return data.ideas.find((i) => i.id === id);
 }
