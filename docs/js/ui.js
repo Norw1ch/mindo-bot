@@ -940,13 +940,13 @@ function ask({ title, fields, date }) {
   sheetDate = date ? dateField(date) : null;
   sheetFields.replaceChildren(...sheetInputs, ...(sheetDate ? [sheetDate] : []));
   hideTabbar('sheet');
-  // «Родной» отступ сверху считаем сейчас, пока клавиатуры нет; дальше его двигает только fitSheet
-  sheetPad = Math.round(viewHeight() * 0.12);
-  sheet.style.paddingTop = `${sheetPad}px`;
-  sheet.classList.remove('closing');
-  sheet.classList.add('open');
-  fitSheet();
   sheetInputs.forEach((el) => { if (!el.dataset.multiline) autoGrow(el); });
+  // Место окна выбираем, пока оно скрыто: оно сразу появляется там, где и останется
+  sheetPad = Math.round(fullHeight * 0.12);
+  sheet.classList.remove('closing');
+  placeSheet();
+  void sheet.offsetWidth;
+  sheet.classList.add('open');
   sheetInputs[0].focus();
   return new Promise((resolve) => {
     sheetResolve = resolve;
@@ -959,33 +959,36 @@ function autoGrow(el) {
   el.style.height = el.scrollHeight + 'px';
 }
 
-// Держим окно ввода в видимой части экрана. Окно стоит на своём месте, пока помещается;
-// если клавиатура закрывает его низ — поднимаем ровно настолько, насколько нужно,
-// а если места совсем мало — делаем ниже многострочное поле (внутри появится прокрутка)
+// Окно ввода стоит над клавиатурой и не двигается вместе с ней. Высота клавиатуры меняется, например
+// при переходе от цифр к буквам, поэтому место выбираем сразу с запасом под самую высокую.
+// Если окно всё же не поместилось — поднимаем его ровно настолько, насколько нужно, и вниз
+// до закрытия не возвращаем; если места совсем мало — делаем ниже многострочное поле
 let sheetPad = 0;
-const SHEET_GAP = 12; // зазор до края видимой области
+const SHEET_GAP = 12;        // зазор до края видимой области
+const KEYBOARD_SHARE = 0.5;  // какую часть экрана держим свободной под клавиатуру
 
-function fitSheet() {
-  if (!sheet.classList.contains('open') || sheet.classList.contains('closing')) return;
+function placeSheet() {
   const vv = window.visualViewport;
   const visible = viewHeight();
-  // Окно занимает только видимую часть экрана (над клавиатурой)
   sheet.style.top = `${vv ? vv.offsetTop : 0}px`;
-  sheet.style.height = `${visible}px`;
 
   const box = sheet.querySelector('.sheet-box');
   const multi = sheetInputs.find((el) => el.dataset.multiline);
   if (multi) multi.style.maxHeight = '';
   const boxHeight = box.offsetHeight;
-  let pad = sheetPad;
-  const overflow = pad + boxHeight - (visible - SHEET_GAP);
+  const lowest = Math.min(visible, fullHeight * (1 - KEYBOARD_SHARE)) - SHEET_GAP;
+  const overflow = sheetPad + boxHeight - lowest;
   if (overflow > 0) {
-    pad = Math.max(SHEET_GAP, pad - overflow);
-    const still = pad + boxHeight - (visible - SHEET_GAP);
+    sheetPad = Math.max(SHEET_GAP, sheetPad - overflow);
+    const still = sheetPad + boxHeight - lowest;
     if (still > 0 && multi) multi.style.maxHeight = `${Math.max(64, multi.offsetHeight - still)}px`;
   }
-  sheet.style.paddingTop = `${pad}px`;
-  if (datePopShown) placeDatePop(pad, visible);
+  sheet.style.paddingTop = `${sheetPad}px`;
+  if (datePopShown) placeDatePop(sheetPad, visible);
+}
+
+function fitSheet() {
+  if (sheet.classList.contains('open') && !sheet.classList.contains('closing')) placeSheet();
 }
 
 // Enter в однострочном поле — к следующему полю или сохранить; Ctrl+Enter — сохранить всегда
@@ -1007,9 +1010,7 @@ function closeSheet(result) {
   releaseTabbar('sheet');
   sheetTimer = setTimeout(() => {
     sheet.classList.remove('open', 'closing');
-    // Окно спрятано — возвращаем ему обычные размеры
-    sheet.style.top = '';
-    sheet.style.height = '';
+    sheet.style.top = ''; // окно спрятано — возвращаем его на обычное место
   }, 260);
   const resolve = sheetResolve;
   sheetResolve = null;
