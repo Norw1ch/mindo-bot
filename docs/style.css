@@ -19,6 +19,9 @@
   /* Нижний отступ под «полоску» iPhone: берём больший из системного и телеграмовского */
   --safe-b: max(env(safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px));
   --tabbar-h: calc(54px + var(--safe-b));
+  --tabbar-radius: 28px;
+
+  --gray: #8e8e93;          /* подписи: вкладки и главная */
 
   --ease: cubic-bezier(.32, .72, 0, 1);
   --soft: cubic-bezier(.2, .9, .3, 1);
@@ -61,7 +64,8 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 
 /* ---------- Вкладки ---------- */
 /* У каждой вкладки свой слой .pane со своей стопкой экранов; виден только активный */
-#app { position: fixed; top: 0; left: 0; right: 0; bottom: var(--tabbar-h); overflow: hidden; }
+/* Экран заходит под панель вкладок на её скругление: в углах панели видно содержимое, а не пустоту */
+#app { position: fixed; top: 0; left: 0; right: 0; bottom: calc(var(--tabbar-h) - var(--tabbar-radius)); overflow: hidden; }
 .pane { position: absolute; inset: 0; overflow: hidden; visibility: hidden; }
 .pane.active { visibility: visible; }
 .pane.tab-in { animation: tab-in .32s ease; }
@@ -69,6 +73,7 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
   display: flex; height: var(--tabbar-h); padding: 5px 4px var(--safe-b);
+  border-radius: var(--tabbar-radius) var(--tabbar-radius) 0 0;
   background: var(--bar);
   -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
   box-shadow: 0 -0.5px 0 var(--sep);
@@ -82,14 +87,15 @@ body.no-tabbar .tabbar {
   transition: opacity .12s ease, visibility 0s linear .12s;
 }
 .tab {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
-  color: var(--muted); font-size: 10px; font-weight: 500;
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  color: var(--gray); font-size: 11px; font-weight: 500; white-space: nowrap;
   transition: color .25s ease;
 }
 .tab svg { width: 26px; height: 26px; transition: transform .3s var(--soft); }
 .tab:active svg { transform: scale(0.86); transition-duration: .1s; }
 .tab.active { color: var(--fg); }
 .tab.active svg { stroke-width: 2.1; }
+@media (max-width: 350px) { .tab { font-size: 10px; } } /* шесть подписей в ряд на самых узких экранах */
 
 /* ---------- Экраны-слои ---------- */
 .screen {
@@ -99,7 +105,7 @@ body.no-tabbar .tabbar {
 }
 .screen ~ .screen { box-shadow: -12px 0 32px rgba(0, 0, 0, 0.14); } /* тень от верхнего слоя */
 .screen.covered { visibility: hidden; }
-.screen-inner { max-width: 560px; margin: 0 auto; padding: 16px 16px 48px; }
+.screen-inner { max-width: 560px; margin: 0 auto; padding: 16px 16px calc(48px + var(--tabbar-radius)); }
 
 /* Затемнение нижнего экрана во время перехода */
 .shade { position: absolute; inset: 0; background: var(--shade); pointer-events: none; }
@@ -336,6 +342,9 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .cal-day:disabled { color: var(--faint); cursor: default; }
 .cal-day:active:not(:disabled) { transform: scale(0.86); transition-duration: .1s; }
 .cal-day.just.done { animation: check-pop .4s var(--soft); }
+
+/* ---------- Главная ---------- */
+.home-date { margin-bottom: 2px; color: var(--gray); font-size: 13px; }
 
 /* ---------- Расходы ---------- */
 /* Серый кружок с первой буквой категории */

@@ -11,6 +11,10 @@ function icon(paths) {
 // root — главный экран вкладки
 const TABS = [
   {
+    key: 'home', label: 'Главная', root: { name: 'home' },
+    icon: icon('<path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5v9A1.5 1.5 0 0 0 7 20h10a1.5 1.5 0 0 0 1.5-1.5v-9"/><path d="M10 20v-5.5h4V20"/>'),
+  },
+  {
     key: 'plans', label: 'Планы', root: { name: 'main' },
     icon: icon('<circle cx="12" cy="12" r="9"/><path d="m8.2 12.4 2.6 2.6 5-5.2"/>'),
   },
@@ -48,7 +52,7 @@ async function start() {
   try {
     await loadData();
     root.replaceChildren(); // убираем «Загрузка…»
-    switchTab('plans');
+    switchTab('home');
     // Первый экран: строки появляются по очереди
     const first = screens[0];
     first.classList.add('intro');
