@@ -250,6 +250,18 @@ function monthTitle(date) {
   return text[0].toUpperCase() + text.slice(1);
 }
 
+// На сколько месяцев дата отстоит от текущего: 0 — этот месяц, -1 — прошлый
+function monthOffset(key) {
+  const date = keyToDate(key);
+  const now = new Date();
+  return (date.getFullYear() - now.getFullYear()) * 12 + date.getMonth() - now.getMonth();
+}
+
+// Полная дата: «31 окт. 2026 г.»
+function fullDate(key) {
+  return keyToDate(key).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 // Коротко: «Сегодня», «Завтра», «Вчера», иначе «5 нояб.»
 function dayLabel(key) {
   const today = dayKey();

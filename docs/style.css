@@ -464,6 +464,38 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .sheet-actions .btn { height: 48px; border-radius: 16px; background: var(--field); }
 .sheet-actions .btn.primary { background: var(--inv-bg); }
 
+/* Строка «Дата» в окне ввода */
+.sheet-date {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; padding: 8px 8px 8px 14px; border-radius: 16px;
+  background: var(--field); color: var(--fg);
+}
+.date-pill { padding: 6px 12px; border-radius: 999px; background: var(--field); font-size: 15px; transition: opacity .2s ease; }
+.sheet-date:active .date-pill { opacity: 0.6; transition-duration: .1s; }
+
+/* Календарь поверх окна ввода */
+.date-pop {
+  position: absolute; z-index: 1; top: 0; left: 20px; right: 20px;
+  max-width: 400px; margin: 0 auto; padding: 14px 0; border-radius: 28px;
+  border: 0.5px solid var(--sep);
+  background: var(--sheet);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+  opacity: 0; visibility: hidden; transform: scale(0.92); transform-origin: top right;
+  transition: opacity .2s ease, transform .2s ease, visibility 0s linear .2s;
+}
+/* top меняется плавно — когда клавиатура уезжает и окно опускается на место */
+.date-pop.open {
+  opacity: 1; visibility: visible; transform: none;
+  transition: opacity .25s ease, transform .4s var(--soft), top .3s var(--soft);
+}
+.date-pop .cal-head { padding: 0 12px 0 20px; }
+/* Поля — у сеток, а не у окна: при листании числа доезжают до самого края */
+.date-pop .cal-week, .date-pop .cal-grid { padding: 0 10px; }
+.date-pop .cal-week { font-size: 11px; font-weight: 600; text-transform: uppercase; }
+.date-pop .pager-btn { background: none; }
+.date-arrows { display: flex; gap: 6px; }
+
 /* ---------- Меню выбора снизу (как в iOS) ---------- */
 .choice {
   position: fixed; inset: 0; z-index: 11;

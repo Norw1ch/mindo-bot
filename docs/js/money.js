@@ -321,7 +321,7 @@ async function pickCat(title, current) {
 }
 
 Object.assign(actions, {
-  // Сначала сумма (цифровая клавиатура), потом категория
+  // Сначала сумма (цифровая клавиатура) и дата (по умолчанию сегодня), потом категория
   'add-expense': async () => {
     const res = await ask({
       title: 'Новый расход',
@@ -329,6 +329,7 @@ Object.assign(actions, {
         { placeholder: `Сумма, ${CURRENCY}`, max: 14, inputmode: 'decimal', check: checkAmount },
         { placeholder: 'Комментарий — необязательно', max: NOTE_MAX, optional: true },
       ],
+      date: dayKey(),
     });
     if (!res) return;
     const catId = await pickCat('Категория', null);
@@ -336,10 +337,13 @@ Object.assign(actions, {
       toast('Расход не сохранён — не выбрана категория');
       return;
     }
-    const expense = { id: newId(), a: parseAmount(res[0]), c: catId, t: Date.now(), n: res[1] };
+    const day = res[2];
+    // Другой день — полдень, как при смене даты у готового расхода
+    const time = day === dayKey() ? Date.now() : keyToDate(day).setHours(12);
+    const expense = { id: newId(), a: parseAmount(res[0]), c: catId, t: time, n: res[1] };
     flash = new Set([expense.id, 'total']); // новая строка появляется, итог мягко меняется
     const route = currentRoute();
-    route.month = 0; // новый расход — в текущем месяце
+    route.month = monthOffset(day); // показываем месяц, в который попал расход
     route.page = 0;
     const ok = await commit(() => {
       expenses.items.push(expense);

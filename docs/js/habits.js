@@ -184,23 +184,27 @@ function shownMonth(route) {
   return new Date(now.getFullYear(), now.getMonth() + (route.month || 0), 1);
 }
 
-// Числа месяца (сетка Пн–Вс). Всегда 6 недель (42 клетки) — высота календаря не меняется
-function calCellsHtml(h, route) {
-  const shown = shownMonth(route);
+// Числа месяца (сетка Пн–Вс). Всегда 6 недель (42 клетки) — высота календаря не меняется.
+// month — сдвиг от текущего месяца; dayHtml(d, num, key) рисует кнопку дня
+function monthCellsHtml(month, dayHtml) {
+  const shown = shownMonth({ month });
   const y = shown.getFullYear();
   const m = shown.getMonth();
-  const today = dayNum();
   const offset = (shown.getDay() + 6) % 7; // с понедельника
   const daysIn = new Date(y, m + 1, 0).getDate();
   const cells = [];
   for (let i = 0; i < offset; i++) cells.push('<span></span>');
-  for (let d = 1; d <= daysIn; d++) {
-    const num = Date.UTC(y, m, d) / 864e5;
-    const cls = `${isDone(h, num) ? ' done' : ''}${num === today ? ' today' : ''}${isScheduled(h, num) ? '' : ' off'}`;
-    cells.push(`<button class="cal-day${cls}" data-act="toggle-habit-day" data-id="${h.id}" data-day="${num}"${num > today ? ' disabled' : ''}>${d}</button>`);
-  }
+  for (let d = 1; d <= daysIn; d++) cells.push(dayHtml(d, Date.UTC(y, m, d) / 864e5, dayKey(new Date(y, m, d))));
   while (cells.length < 42) cells.push('<span class="cal-pad"></span>');
   return cells.join('');
+}
+
+function calCellsHtml(h, route) {
+  const today = dayNum();
+  return monthCellsHtml(route.month, (d, num) => {
+    const cls = `${isDone(h, num) ? ' done' : ''}${num === today ? ' today' : ''}${isScheduled(h, num) ? '' : ' off'}`;
+    return `<button class="cal-day${cls}" data-act="toggle-habit-day" data-id="${h.id}" data-day="${num}"${num > today ? ' disabled' : ''}>${d}</button>`;
+  });
 }
 
 // Заголовок со стрелками и дни недели стоят на месте, перелистывается только сетка чисел
@@ -225,19 +229,31 @@ const CAL_EASE = 'cubic-bezier(.25, .8, .25, 1)';
 const CAL_COMPLETE = 0.25; // какую долю ширины протянуть, чтобы перелистнуть
 const CAL_FLICK = 0.4;     // скорость (пикселей в мс) короткого смахивания
 
-function canGo(route, dir) {
-  return dir < 0 || (route.month || 0) + dir <= 0;
+// Откуда календарь берёт месяц и числа. Календарь выбора даты задаёт свой источник в cal.source,
+// иначе это календарь привычки на текущем экране
+const habitCalSource = {
+  get month() { return currentRoute().month || 0; },
+  set month(value) { currentRoute().month = value; },
+  cells: (month) => calCellsHtml(habits.find(currentRoute().id), { month }),
+};
+
+function calSource(cal) {
+  return cal.source || habitCalSource;
+}
+
+function canGo(month, dir) {
+  return dir < 0 || month + dir <= 0;
 }
 
 // Начать перелистывание в сторону dir (1 — следующий месяц, -1 — прошлый): соседняя сетка встаёт рядом
 function calPeek(cal, dir) {
-  const route = currentRoute();
+  const src = calSource(cal);
   const viewport = cal.querySelector('.cal-viewport');
   const p = { cal, dir, viewport, old: viewport.querySelector('.cal-grid'), fresh: null, width: viewport.offsetWidth || 320 };
-  if (canGo(route, dir)) {
+  if (canGo(src.month, dir)) {
     p.fresh = document.createElement('div');
     p.fresh.className = 'cal-grid sliding';
-    p.fresh.innerHTML = calCellsHtml(habits.find(route.id), { month: (route.month || 0) + dir });
+    p.fresh.innerHTML = src.cells(src.month + dir);
     p.fresh.style.transform = `translateX(${dir > 0 ? 100 : -100}%)`;
     viewport.append(p.fresh);
   }
@@ -264,12 +280,12 @@ function calSettle(p, complete, duration = CAL_MS) {
 
   if (go) {
     // Месяц сменился — заголовок и стрелку обновляем сразу, мягким проявлением (без размытия)
-    const route = currentRoute();
-    route.month = (route.month || 0) + p.dir;
+    const src = calSource(p.cal);
+    src.month += p.dir;
     const title = p.cal.querySelector('.cal-title');
-    title.textContent = monthTitle(shownMonth(route));
+    title.textContent = monthTitle(shownMonth(src));
     if (title.animate && !reduceMotion) title.animate([{ opacity: 0.2 }, { opacity: 1 }], { duration: 300, easing: 'ease-out' });
-    p.cal.querySelector('[data-dir="1"]').disabled = (route.month || 0) >= 0;
+    p.cal.querySelector('[data-dir="1"]').disabled = src.month >= 0;
     softHaptic();
   }
 
@@ -299,7 +315,7 @@ function calFinishRunning(cal) {
 // Стрелки ‹ ›
 function slideCalendar(cal, dir) {
   calFinishRunning(cal);
-  if (!canGo(currentRoute(), dir)) return;
+  if (!canGo(calSource(cal).month, dir)) return;
   calSettle(calPeek(cal, dir), true);
 }
 
