@@ -22,6 +22,7 @@
   --tabbar-radius: 28px;
 
   --gray: #8e8e93;          /* подписи: вкладки и главная */
+  --dash: #c7c7cc;          /* пунктирная рамка */
 
   --ease: cubic-bezier(.32, .72, 0, 1);
   --soft: cubic-bezier(.2, .9, .3, 1);
@@ -42,6 +43,7 @@
   --shade: rgba(0, 0, 0, 0.5);
   --backdrop: rgba(0, 0, 0, 0.5);
   --bar: rgba(22, 22, 22, 0.94);
+  --dash: #3a3a3c;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -345,10 +347,10 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 
 /* ---------- Главная ---------- */
 .home-date { margin-bottom: 2px; color: var(--gray); font-size: 13px; }
+.home-label { color: var(--gray); font-size: 13px; text-transform: uppercase; letter-spacing: 0.02em; }
 
 /* Карточка «Сегодня»: три числа в ряд и прогресс привычек */
 .today-card { margin-top: 18px; padding: 20px; border-radius: 28px; background: var(--cell); }
-.today-head { color: var(--gray); font-size: 13px; text-transform: uppercase; letter-spacing: 0.02em; }
 .today-stats { display: flex; margin-top: 14px; }
 .today-stat { flex: 1 1 auto; min-width: 0; padding: 0 10px; text-align: center; }
 .today-stat:first-child { padding-left: 0; }
@@ -373,6 +375,23 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
   min-width: 0; height: 48px; padding: 0 8px; border-radius: 24px; font-size: 15px;
 }
 .quick-btn svg { flex: none; width: 18px; height: 18px; }
+
+/* Плитки разделов */
+.tiles-head { margin: 26px 18px 8px; }
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.tile {
+  display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;
+  height: 92px; padding: 13px 16px; border-radius: 28px;
+  background: var(--cell); text-align: left;
+  transition: transform .25s var(--soft), opacity .25s ease;
+}
+.tile:active { transform: scale(0.97); opacity: 0.8; transition-duration: .1s; }
+.tile svg { flex: none; width: 22px; height: 22px; }
+.tile-text { display: block; width: 100%; min-width: 0; }
+.tile-text b { display: block; font-size: 16px; font-weight: 700; line-height: 20px; white-space: nowrap; }
+.tile-text span { display: block; color: var(--gray); font-size: 13px; line-height: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile.add { border: 1px dashed var(--dash); background: transparent; color: var(--gray); }
+@media (max-width: 350px) { .tile { padding: 13px 12px; } }
 
 /* ---------- Расходы ---------- */
 /* Серый кружок с первой буквой категории */
