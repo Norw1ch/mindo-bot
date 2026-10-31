@@ -329,6 +329,43 @@ function swapPeriod(inner, route, cls) {
   swapContent(inner.querySelector('.month-box'), periodHtml(route), cls);
 }
 
+// Поля дат появляются и прячутся одним сдвигом: всё, что ниже, едет единым блоком, а страница
+// не пересчитывается в каждом кадре — иначе на телефоне движение дёргается.
+// Поля занимают своё место всё движение и убираются, только когда блок под ними доехал
+const RANGE_MS = 420;
+
+function toggleRange(inner, show) {
+  const card = inner.querySelector('.range-card');
+  const rest = inner.querySelector('.after-range');
+  if (reduceMotion || !rest.animate) {
+    card.classList.toggle('hidden', !show);
+    return;
+  }
+  // Прошлое движение могло не закончиться — продолжаем с того места, где блоки сейчас
+  const nowTop = rest.getBoundingClientRect().top;
+  const nowOpacity = card.classList.contains('hidden') ? 0 : Number(window.getComputedStyle(card).opacity);
+  (card.rangeAnims || []).forEach((a) => a.cancel());
+  card.classList.add('hidden');
+  const closedTop = rest.getBoundingClientRect().top;
+  card.classList.remove('hidden');
+  const openTop = rest.getBoundingClientRect().top;
+
+  const opts = { duration: RANGE_MS, easing: SLIDE_EASE, fill: 'forwards' };
+  const anims = [
+    rest.animate([
+      { transform: `translateY(${nowTop - openTop}px)` },
+      { transform: `translateY(${show ? 0 : closedTop - openTop}px)` },
+    ], opts),
+    card.animate([{ opacity: nowOpacity }, { opacity: show ? 1 : 0 }], opts),
+  ];
+  card.rangeAnims = anims;
+  anims[0].onfinish = () => {
+    card.rangeAnims = null;
+    if (!show) card.classList.add('hidden');
+    anims.forEach((a) => a.cancel());
+  };
+}
+
 pagers.money = expenseListHtml;
 pagers.mcat = expenseListHtml;
 
@@ -338,13 +375,15 @@ views.money = (route) => `
   <h1>${t('Расходы')}</h1>
   ${chipsHtml(route)}
   <div class="range-card${periodOf(route).key === 'custom' ? '' : ' hidden'}">${rangeHtml(route)}</div>
-  <div class="total-box paged">${totalHtml(route)}</div>
-  <div class="actions total-action">
-    <button class="btn primary" data-act="add-expense">➕ ${t('Добавить расход')}</button>
-  </div>
-  <div class="month-box paged">${periodHtml(route)}</div>
-  <div class="group">
-    <button class="row" data-act="open-mcats"><span class="title">${t('Категории')}</span><span class="meta">${mcats.length}</span>${CHEVRON}</button>
+  <div class="after-range">
+    <div class="total-box paged">${totalHtml(route)}</div>
+    <div class="actions total-action">
+      <button class="btn primary" data-act="add-expense">➕ ${t('Добавить расход')}</button>
+    </div>
+    <div class="month-box paged">${periodHtml(route)}</div>
+    <div class="group">
+      <button class="row" data-act="open-mcats"><span class="title">${t('Категории')}</span><span class="meta">${mcats.length}</span>${CHEVRON}</button>
+    </div>
   </div>`;
 
 // Расходы одной категории за выбранный период
@@ -487,11 +526,13 @@ Object.assign(actions, {
   },
 
   // Лента периодов: пилюля и список меняются на месте, лента не прыгает к началу.
-  // Новый итог въезжает с той стороны, куда переключили
+  // Новый итог въезжает с той стороны, куда переключили. Если при этом появляются или прячутся
+  // поля дат, блоки и так едут вверх-вниз — тогда итог просто сменяется, без движения вбок
   'set-period': ({ key }, el) => {
     const route = currentRoute();
     const order = PERIODS.map((p) => p.key);
-    const from = order.indexOf(periodOf(route).key);
+    const old = periodOf(route).key;
+    const from = order.indexOf(old);
     const to = order.indexOf(key);
     if (from === to) return;
     route.period = key;
@@ -500,8 +541,9 @@ Object.assign(actions, {
     chips.querySelectorAll('.chip').forEach((chip) => chip.classList.toggle('active', chip === el));
     centerChip(chips, true);
     const inner = el.closest('.screen-inner');
-    revealBlock(inner.querySelector('.range-card'), key === 'custom');
-    swapPeriod(inner, route, to > from ? 'page-next' : 'page-prev');
+    const rangeMoves = key === 'custom' || old === 'custom';
+    if (rangeMoves) toggleRange(inner, key === 'custom');
+    swapPeriod(inner, route, rangeMoves ? 'list-swap' : to > from ? 'page-next' : 'page-prev');
     softHaptic();
   },
 
