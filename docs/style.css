@@ -21,6 +21,10 @@
   --tabbar-h: calc(54px + var(--safe-b));
   --tabbar-radius: 28px;
 
+  /* Скругления одни на всё приложение: блоки и поля. Кнопки — пилюли (радиус в половину высоты) */
+  --r-block: 28px;
+  --r-field: 22px;
+
   --gray: #8e8e93;          /* подписи: вкладки и главная */
   --dash: #c7c7cc;          /* пунктирная рамка */
 
@@ -120,7 +124,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .empty { padding: 32px 0; color: var(--muted); text-align: center; }
 
 /* ---------- Списки (скруглённые блоки) ---------- */
-.group { margin-top: 22px; border-radius: 20px; overflow: hidden; background: var(--cell); }
+.group { margin-top: 22px; border-radius: var(--r-block); overflow: hidden; background: var(--cell); }
 .row {
   position: relative; z-index: 1;
   display: flex; align-items: center; gap: 10px;
@@ -162,18 +166,18 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 /* ---------- Переключатель (фильтры и статусы) ---------- */
 .seg {
   position: relative; display: grid; grid-template-columns: repeat(var(--n), 1fr);
-  margin-top: 18px; padding: 3px; border-radius: 14px; background: var(--field);
+  margin-top: 18px; padding: 3px; border-radius: var(--r-field); background: var(--field);
 }
 .seg-pill {
   position: absolute; top: 3px; bottom: 3px; left: 3px;
-  width: calc((100% - 6px) / var(--n)); border-radius: 11px;
+  width: calc((100% - 6px) / var(--n)); border-radius: 19px;
   background: var(--cell); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.12);
   transform: translateX(calc(var(--k) * 100%));
   transition: transform .45s var(--soft);
 }
 [data-theme="dark"] .seg-pill { background: #636366; }
 .seg-btn {
-  position: relative; z-index: 1; min-width: 0; padding: 8px 2px; border-radius: 11px;
+  position: relative; z-index: 1; min-width: 0; padding: 8px 2px; border-radius: 19px;
   color: var(--muted); font-size: 13px; font-weight: 500; white-space: nowrap;
   transition: color .3s ease;
 }
@@ -181,6 +185,8 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 /* Большой вариант — статусы в карточке: значок над подписью */
 .seg.big .seg-btn { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 2px; }
 .seg.big .ic { font-size: 18px; line-height: 1.2; }
+.seg.big { border-radius: var(--r-block); }
+.seg.big .seg-pill, .seg.big .seg-btn { border-radius: 25px; }
 
 /* Список после смены фильтра мягко проявляется */
 .paged.list-swap { animation: in-fade .35s ease; }
@@ -214,7 +220,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .search { display: flex; align-items: center; margin-top: 14px; }
 .search-field {
   flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px;
-  height: 38px; padding: 0 10px; border-radius: 12px;
+  height: 38px; padding: 0 10px; border-radius: var(--r-field);
   background: var(--field); color: var(--muted); cursor: text;
 }
 .search-field svg { flex: none; width: 17px; height: 17px; }
@@ -317,12 +323,12 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .day-all { display: block; margin: 12px auto 0; color: var(--muted); font-size: 15px; }
 
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
-.stat { padding: 14px 8px 12px; border-radius: 18px; background: var(--cell); text-align: center; }
+.stat { padding: 14px 8px 12px; border-radius: var(--r-block); background: var(--cell); text-align: center; }
 .stat b { display: block; font-size: 26px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .habit-info { display: inline-block; } /* чтобы подпись могла мягко смениться (.swap) */
 .stat span { color: var(--muted); font-size: 13px; }
 
-.cal { margin-top: 14px; padding: 12px 12px 16px; border-radius: 20px; background: var(--cell); }
+.cal { margin-top: 14px; padding: 12px 12px 16px; border-radius: var(--r-block); background: var(--cell); }
 .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .cal-head .pager-btn { width: 34px; height: 34px; background: var(--field); }
 .cal-title { font-weight: 600; }
@@ -350,11 +356,11 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .home-label { color: var(--gray); font-size: 13px; text-transform: uppercase; letter-spacing: 0.02em; }
 
 /* Поиск по всему — пилюля */
-.home-search .search-field { height: 44px; padding: 0 16px; border-radius: 22px; background: var(--cell); color: var(--gray); }
+.home-search .search-field { height: 44px; padding: 0 16px; background: var(--cell); color: var(--gray); }
 .home-search .search-input::placeholder { color: var(--gray); }
 
 /* Карточка «Сегодня»: три числа в ряд и прогресс привычек */
-.today-card { margin-top: 18px; padding: 20px; border-radius: 28px; background: var(--cell); }
+.today-card { margin-top: 18px; padding: 20px; border-radius: var(--r-block); background: var(--cell); }
 .today-stats { display: flex; margin-top: 14px; }
 .today-stat { flex: 1 1 auto; min-width: 0; padding: 0 10px; text-align: center; }
 .today-stat:first-child { padding-left: 0; }
@@ -385,7 +391,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .tile {
   display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;
-  height: 92px; padding: 13px 16px; border-radius: 28px;
+  height: 92px; padding: 13px 16px; border-radius: var(--r-block);
   background: var(--cell); text-align: left;
   transition: transform .25s var(--soft), opacity .25s ease;
 }
@@ -408,7 +414,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .cat-bar { display: block; height: 4px; margin-top: 6px; border-radius: 2px; background: var(--field); overflow: hidden; }
 .cat-bar span { display: block; height: 100%; border-radius: 2px; background: var(--muted); }
 
-.total-card { margin-top: 18px; padding: 12px 12px 18px; border-radius: 20px; background: var(--cell); text-align: center; }
+.total-card { margin-top: 18px; padding: 12px 12px 18px; border-radius: var(--r-block); background: var(--cell); text-align: center; }
 .total-sum { display: block; margin-top: 6px; font-size: 36px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .total-sub { color: var(--muted); font-size: 14px; }
 
@@ -416,7 +422,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 #choice-opts { max-height: 60vh; overflow-y: auto; }
 
 /* ---------- Карточка идеи ---------- */
-.card { margin-top: 14px; padding: 18px 20px; border-radius: 20px; background: var(--cell); }
+.card { margin-top: 14px; padding: 18px 20px; border-radius: var(--r-block); background: var(--cell); }
 .idea-text { white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
 .idea-text.none { color: var(--faint); }
 
@@ -465,7 +471,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .swipe .row.dragging { background: var(--cell); transition: background-color .3s ease; }
 .swipe-del {
   position: absolute; top: 6px; bottom: 6px; right: 8px; width: 80px;
-  border-radius: 14px; background: var(--red); color: #fff;
+  border-radius: 20px; background: var(--red); color: #fff; /* угол идёт параллельно углу блока: 28 − 8 */
   font-size: 15px; font-weight: 600;
   opacity: 0; transform: translateX(24px) scale(0.85);
 }
@@ -483,7 +489,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 /* ---------- Кнопки ---------- */
 .actions { display: grid; gap: 10px; margin-top: 22px; }
 .btn {
-  height: 52px; padding: 0 16px; border-radius: 18px;
+  height: 52px; padding: 0 16px; border-radius: 26px;
   background: var(--cell); font-weight: 600;
   transition: transform .25s var(--soft), opacity .25s ease;
 }
@@ -505,7 +511,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .sheet.open { opacity: 1; visibility: visible; transition: opacity .3s ease, padding-top .3s var(--soft); }
 .sheet.open.closing { opacity: 0; transition: opacity .25s ease; }
 .sheet-box {
-  width: 100%; max-width: 400px; padding: 22px 18px 18px; border-radius: 28px;
+  width: 100%; max-width: 400px; padding: 22px 18px 18px; border-radius: var(--r-block);
   background: var(--sheet);
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
@@ -516,18 +522,18 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .sheet-fields { display: grid; gap: 10px; }
 .sheet textarea {
   display: block; width: 100%; padding: 12px 14px; resize: none;
-  border: 0; border-radius: 16px; outline: none;
+  border: 0; border-radius: var(--r-field); outline: none;
   background: var(--field); color: var(--fg); font: inherit;
 }
 .sheet textarea::placeholder { color: var(--faint); }
 .sheet-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
-.sheet-actions .btn { height: 48px; border-radius: 16px; background: var(--field); }
+.sheet-actions .btn { height: 48px; border-radius: 24px; background: var(--field); }
 .sheet-actions .btn.primary { background: var(--inv-bg); }
 
 /* Строка «Дата» в окне ввода */
 .sheet-date {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  width: 100%; padding: 8px 8px 8px 14px; border-radius: 16px;
+  width: 100%; padding: 8px 8px 8px 14px; border-radius: var(--r-field);
   background: var(--field); color: var(--fg);
 }
 .date-pill { padding: 6px 12px; border-radius: 999px; background: var(--field); font-size: 15px; transition: opacity .2s ease; }
@@ -536,7 +542,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 /* Календарь поверх окна ввода */
 .date-pop {
   position: absolute; z-index: 1; top: 0; left: 20px; right: 20px;
-  max-width: 400px; margin: 0 auto; padding: 14px 0; border-radius: 28px;
+  max-width: 400px; margin: 0 auto; padding: 14px 0; border-radius: var(--r-block);
   border: 0.5px solid var(--sep);
   background: var(--sheet);
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
@@ -574,7 +580,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .choice.open .choice-box { transform: none; }
 .choice.closing .choice-box { transform: translateY(110%); transition-duration: .32s; }
 .choice-list {
-  overflow: hidden; border-radius: 18px; background: var(--sheet);
+  overflow: hidden; border-radius: var(--r-block); background: var(--sheet);
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
 }
 .choice-title { padding: 14px 16px 12px; color: var(--muted); font-size: 13px; text-align: center; }
@@ -594,7 +600,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
   opacity: 0; border: 0; -webkit-appearance: none; appearance: none; cursor: pointer;
 }
 .choice-cancel {
-  display: block; width: 100%; margin-top: 8px; padding: 16px; border-radius: 18px;
+  display: block; width: 100%; margin-top: 8px; padding: 16px; border-radius: var(--r-block);
   background: var(--cell); font-size: 18px; font-weight: 600;
   transition: transform .25s var(--soft);
 }
