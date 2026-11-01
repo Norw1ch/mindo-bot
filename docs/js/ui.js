@@ -374,7 +374,7 @@ function updateBackButton() {
 
 // Перезапускает анимацию появления блока (класс cls)
 function restartAnim(el, cls) {
-  el.classList.remove('list-swap', 'fade-swap', 'tab-in');
+  el.classList.remove('list-swap', 'tab-in');
   void el.offsetWidth; // без этого анимация с тем же классом не повторится
   el.classList.add(cls);
 }
@@ -382,32 +382,41 @@ function restartAnim(el, cls) {
 // Обрезать по вертикали, не трогая края по бокам (в старых браузерах — просто обрезать)
 const CLIP_Y = window.CSS && CSS.supports('overflow-y', 'clip') ? 'clip' : 'hidden';
 
-const SWAP_OUT_MS = 80; // сколько гаснет старое; новое проявляется следом (.fade-swap в стилях)
+const SWAP_OUT_MS = 70; // блок гаснет
+const SWAP_IN_MS = 130; // и проявляется с новым содержимым: вместе 0,2 с
 const HEIGHT_MS = 400;
 const HEIGHT_EASE = 'cubic-bezier(.45, 0, .15, 1)'; // как у таблетки: мягкий старт и остановка
 
-// Меняет содержимое блока на месте: старое быстро гаснет, новое проявляется следом, ничего не
-// ездит вбок — иначе два текста видны поверх друг друга и в глазах рябит. Высота блока плавно
-// перетекает от старой к новой, поэтому то, что ниже, не прыгает.
-// smoothHeight: false — высота меняется сразу: если под блоком ничего нет, анимировать её незачем
-function swapContent(box, html, smoothHeight = true) {
+// Меняет содержимое блока на месте: весь блок целиком гаснет, содержимое подменяется, пока его
+// не видно, и блок проявляется. Ничего не ездит и не накладывается, а прозрачность одна на весь
+// блок — поэтому ни один элемент не может отстать от остальных.
+// smoothHeight: false — высота меняется сразу: если под блоком ничего нет, анимировать её незачем.
+// done — что сделать, когда новое содержимое уже на странице
+function swapContent(box, html, { smoothHeight = true, done } = {}) {
+  box.swapNext = { html, smoothHeight, done };
+  if (reduceMotion || !box.animate) {
+    showSwapNext(box);
+    return;
+  }
+  if (box.fadeOut) return; // блок уже гаснет — покажем самое свежее
+  const start = Number(window.getComputedStyle(box).opacity); // могло ещё идти проявление
+  if (box.fadeIn) box.fadeIn.cancel();
+  const out = box.animate([{ opacity: start }, { opacity: 0 }], { duration: SWAP_OUT_MS, easing: 'ease-out', fill: 'forwards' });
+  box.fadeOut = out;
+  out.onfinish = () => {
+    box.fadeOut = null;
+    showSwapNext(box);
+    box.fadeIn = box.animate([{ opacity: 0 }, { opacity: 1 }], { duration: SWAP_IN_MS, easing: 'ease-out' });
+    out.cancel();
+  };
+}
+
+function showSwapNext(box) {
+  const { html, smoothHeight, done: after } = box.swapNext;
   const from = box.offsetHeight; // если прошлая анимация ещё идёт — это её текущая высота
   if (box.heightAnim) box.heightAnim.cancel();
-  box.querySelectorAll('.swap-ghost').forEach((g) => g.remove()); // прошлый призрак, если не успел уйти
-
-  let ghost = null;
-  if (!reduceMotion && box.animate) {
-    ghost = document.createElement('div');
-    ghost.className = 'swap-ghost';
-    ghost.innerHTML = box.innerHTML;
-  }
   box.innerHTML = html;
-  restartAnim(box, 'fade-swap');
-  if (ghost) {
-    box.append(ghost);
-    const out = ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: SWAP_OUT_MS, easing: 'ease-out', fill: 'forwards' });
-    out.onfinish = () => ghost.remove();
-  }
+  if (after) after();
   const to = box.offsetHeight;
   if (!smoothHeight || from === to || reduceMotion || !box.animate) return;
 

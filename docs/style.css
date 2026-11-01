@@ -208,12 +208,8 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .pager-info { min-width: 56px; color: var(--muted); font-size: 15px; text-align: center; font-variant-numeric: tabular-nums; }
 
 /* flow-root: отступ первого элемента остаётся внутри блока. Иначе браузер выносит его наружу,
-   а «призрак» и анимация высоты держат его внутри — содержимое на миг прыгало вниз */
+   а анимация высоты держит его внутри — содержимое на миг прыгало вниз */
 .paged { position: relative; display: flow-root; }
-/* Смена содержимого на месте: старое гаснет, и только потом проявляется новое — без наложения */
-.paged.fade-swap > :not(.swap-ghost) { animation: in-fade .15s ease .05s backwards; }
-/* «Призрак» старого содержимого — поверх нового, нажать на него нельзя */
-.swap-ghost { position: absolute; top: 0; left: 0; right: 0; pointer-events: none; }
 
 /* ---------- Поиск ---------- */
 .search { display: flex; align-items: center; margin-top: 14px; }

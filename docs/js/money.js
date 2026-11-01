@@ -565,10 +565,7 @@ Object.assign(actions, {
     moveSeg(el.closest('.seg'), key);
     softHaptic();
     const box = el.closest('.screen-inner').querySelector('.fin-body');
-    afterSegMove(() => {
-      swapContent(box, finBodyHtml(route), false);
-      sizeEdits(box);
-    });
+    afterSegMove(() => swapContent(box, finBodyHtml(route), { smoothHeight: false, done: () => sizeEdits(box) }));
   },
 
   // Лента периодов: пилюля и список меняются на месте, лента не прыгает к началу
