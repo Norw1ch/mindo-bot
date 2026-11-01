@@ -628,19 +628,16 @@ Object.assign(actions, {
   'open-idea': ({ id }) => go({ name: 'idea', id }),
 
   // Фильтр в разделе: таблетка переезжает, список мягко обновляется
-  // Новый список въезжает с той стороны, куда переключили (вправо по фильтрам — справа)
   'set-filter': ({ key }, el) => {
     const route = currentRoute();
-    const old = route.filter || 'all';
-    if (old === key) return;
-    const order = FILTERS.map((f) => f.key);
+    if ((route.filter || 'all') === key) return;
     route.filter = key;
     route.page = 0;
     closeSwipe(false);
     moveSeg(el.closest('.seg'), key);
     softHaptic();
     const box = el.closest('.screen-inner').querySelector('.paged');
-    afterSegMove(() => swapContent(box, ideaListHtml(route), order.indexOf(key) > order.indexOf(old) ? 'page-next' : 'page-prev'));
+    afterSegMove(() => swapContent(box, ideaListHtml(route)));
   },
 
   // Статус в карточке: сохраняем сразу, экран не перерисовываем, чтобы таблетка плавно переехала

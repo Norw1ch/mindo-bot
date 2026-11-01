@@ -374,20 +374,23 @@ function updateBackButton() {
 
 // Перезапускает анимацию появления блока (класс cls)
 function restartAnim(el, cls) {
-  el.classList.remove('list-swap', 'page-next', 'page-prev', 'tab-in');
+  el.classList.remove('list-swap', 'fade-swap', 'tab-in');
   void el.offsetWidth; // без этого анимация с тем же классом не повторится
   el.classList.add(cls);
 }
 
-// Обрезать по вертикали, не обрезая боковой въезд страницы (в старых браузерах — просто обрезать)
+// Обрезать по вертикали, не трогая края по бокам (в старых браузерах — просто обрезать)
 const CLIP_Y = window.CSS && CSS.supports('overflow-y', 'clip') ? 'clip' : 'hidden';
 
-// Меняет содержимое блока: новое появляется с анимацией cls, а высота блока плавно
-// перетекает от старой к новой — то, что ниже, не прыгает.
-// Старое содержимое не пропадает мгновенно: его «призрак» плавно уезжает и гаснет поверх нового
-// (page-next — влево, page-prev — вправо, иначе просто гаснет).
+const SWAP_OUT_MS = 130; // сколько гаснет старое; новое проявляется следом (.fade-swap в стилях)
+const HEIGHT_MS = 400;
+const HEIGHT_EASE = 'cubic-bezier(.45, 0, .15, 1)'; // как у таблетки: мягкий старт и остановка
+
+// Меняет содержимое блока на месте: старое быстро гаснет, новое проявляется следом, ничего не
+// ездит вбок — иначе два текста видны поверх друг друга и в глазах рябит. Высота блока плавно
+// перетекает от старой к новой, поэтому то, что ниже, не прыгает.
 // smoothHeight: false — высота меняется сразу: если под блоком ничего нет, анимировать её незачем
-function swapContent(box, html, cls, smoothHeight = true) {
+function swapContent(box, html, smoothHeight = true) {
   const from = box.offsetHeight; // если прошлая анимация ещё идёт — это её текущая высота
   if (box.heightAnim) box.heightAnim.cancel();
   box.querySelectorAll('.swap-ghost').forEach((g) => g.remove()); // прошлый призрак, если не успел уйти
@@ -399,14 +402,10 @@ function swapContent(box, html, cls, smoothHeight = true) {
     ghost.innerHTML = box.innerHTML;
   }
   box.innerHTML = html;
-  restartAnim(box, cls);
+  restartAnim(box, 'fade-swap');
   if (ghost) {
     box.append(ghost);
-    const shift = cls === 'page-next' ? '-40px' : cls === 'page-prev' ? '40px' : '0px';
-    const out = ghost.animate(
-      [{ opacity: 1, transform: 'translateX(0)' }, { opacity: 0, transform: `translateX(${shift})` }],
-      { duration: 320, easing: 'cubic-bezier(.4, 0, .2, 1)', fill: 'forwards' },
-    );
+    const out = ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: SWAP_OUT_MS, easing: 'ease-out', fill: 'forwards' });
     out.onfinish = () => ghost.remove();
   }
   const to = box.offsetHeight;
@@ -415,7 +414,7 @@ function swapContent(box, html, cls, smoothHeight = true) {
   box.style.overflowY = CLIP_Y;
   const anim = box.animate(
     [{ height: from + 'px' }, { height: to + 'px' }],
-    { duration: 500, easing: 'cubic-bezier(.2, .9, .3, 1)' },
+    { duration: HEIGHT_MS, easing: HEIGHT_EASE },
   );
   box.heightAnim = anim;
   const done = () => {
@@ -426,7 +425,7 @@ function swapContent(box, html, cls, smoothHeight = true) {
   anim.finished.then(done, done);
 }
 
-// Мягко меняет текст: старый исчезает, новый проявляется с лёгким размытием (класс .swap)
+// Мягко меняет текст: новый проявляется на том же месте (класс .swap)
 function setText(el, text) {
   if (!el || el.textContent === String(text)) return;
   el.textContent = text;
@@ -740,13 +739,13 @@ function showSearchState(inner, searching) {
 Object.assign(actions, {
   'back': back,
 
-  // Листание страниц: новая страница въезжает справа (вперёд) или слева (назад)
+  // Листание страниц
   'set-page': ({ dir }, el) => {
     const route = currentRoute();
     route.page = (route.page || 0) + Number(dir);
     closeSwipe(false);
     const box = el.closest('.paged');
-    swapContent(box, pagers[route.name](route), Number(dir) > 0 ? 'page-next' : 'page-prev');
+    swapContent(box, pagers[route.name](route));
     softHaptic();
     // Если начало списка ушло вверх за экран — плавно поднимаемся к нему
     if (box.getBoundingClientRect().top < 0) box.scrollIntoView({ behavior: 'smooth', block: 'start' });

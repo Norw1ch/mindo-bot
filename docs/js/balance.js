@@ -248,16 +248,14 @@ Object.assign(actions, {
     const route = currentRoute();
     const id = key === 'all' ? null : key;
     if ((route.acc || null) === id) return;
-    const order = ['all', ...accounts.items.map((acc) => acc.id)];
-    const dir = order.indexOf(key) > order.indexOf(route.acc || 'all') ? 'page-next' : 'page-prev';
     route.acc = id;
     route.page = 0;
     const chips = el.closest('.chips');
     chips.querySelectorAll('.chip').forEach((chip) => chip.classList.toggle('active', chip === el));
     centerChip(chips, true);
     const inner = el.closest('.screen-inner');
-    swapContent(inner.querySelector('.total-box'), balanceCardHtml(route), dir);
-    swapContent(inner.querySelector('.ops-box'), historyHtml(route), dir);
+    swapContent(inner.querySelector('.total-box'), balanceCardHtml(route));
+    swapContent(inner.querySelector('.ops-box'), historyHtml(route));
     softHaptic();
   },
 

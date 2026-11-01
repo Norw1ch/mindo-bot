@@ -122,7 +122,7 @@ body.no-tabbar .tabbar {
 
 /* ---------- Заголовок ---------- */
 h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01em; word-break: break-word; }
-.swap { animation: title-swap .5s var(--soft) both; }
+.swap { animation: in-fade .3s ease backwards; }
 .sub { margin-top: 4px; color: var(--muted); font-size: 15px; }
 .back { margin-bottom: 12px; color: var(--muted); font-size: 16px; }
 .empty { padding: 32px 0; color: var(--muted); text-align: center; }
@@ -194,10 +194,6 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .seg.big { border-radius: var(--r-block); }
 .seg.big .seg-pill, .seg.big .seg-btn { border-radius: 25px; }
 
-/* Список после смены фильтра мягко проявляется */
-.paged.list-swap { animation: in-fade .35s ease; }
-.paged.list-swap .swipe { animation: row-in .45s var(--ease) both; animation-delay: calc(var(--i, 0) * 35ms); }
-
 /* ---------- Страницы ---------- */
 .pager { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 14px; }
 .pager-btn {
@@ -211,14 +207,11 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .pager-btn.prev .chev { transform: rotate(180deg); }
 .pager-info { min-width: 56px; color: var(--muted); font-size: 15px; text-align: center; font-variant-numeric: tabular-nums; }
 
-/* Новая страница въезжает справа (вперёд) или слева (назад), старая в это время уезжает и гаснет */
-@keyframes page-next { from { opacity: 0; transform: translateX(40px); } }
-@keyframes page-prev { from { opacity: 0; transform: translateX(-40px); } }
 /* flow-root: отступ первого элемента остаётся внутри блока. Иначе браузер выносит его наружу,
    а «призрак» и анимация высоты держат его внутри — содержимое на миг прыгало вниз */
 .paged { position: relative; display: flow-root; }
-.paged.page-next > .page-items { animation: page-next .5s var(--soft) both; animation-delay: 60ms; }
-.paged.page-prev > .page-items { animation: page-prev .5s var(--soft) both; animation-delay: 60ms; }
+/* Смена содержимого на месте: старое гаснет, и только потом проявляется новое — без наложения */
+.paged.fade-swap > :not(.swap-ghost) { animation: in-fade .26s ease .09s backwards; }
 /* «Призрак» старого содержимого — поверх нового, нажать на него нельзя */
 .swap-ghost { position: absolute; top: 0; left: 0; right: 0; pointer-events: none; }
 
@@ -697,7 +690,6 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 @keyframes row-in      { from { opacity: 0; transform: translateY(8px); } }
 @keyframes alert-in    { from { opacity: 0; transform: scale(1.1); } }
 @keyframes alert-out   { to   { opacity: 0; transform: scale(0.95); } }
-@keyframes title-swap  { from { opacity: 0; filter: blur(4px); } }
 @keyframes row-appear  { from { opacity: 0; max-height: 0; transform: scale(0.98); } to { max-height: 80px; } }
 
 /* Запуск приложения: экран проявляется, строки появляются по очереди (--i — номер строки).

@@ -335,9 +335,9 @@ function periodHtml(route) {
 }
 
 // Период сменился: итог и списки меняются мягко, кнопка между ними стоит на месте
-function swapPeriod(inner, route, cls) {
-  swapContent(inner.querySelector('.total-box'), totalHtml(route), cls);
-  swapContent(inner.querySelector('.month-box'), periodHtml(route), cls);
+function swapPeriod(inner, route) {
+  swapContent(inner.querySelector('.total-box'), totalHtml(route));
+  swapContent(inner.querySelector('.month-box'), periodHtml(route));
 }
 
 // Поля дат появляются и прячутся одним сдвигом: всё, что ниже, едет единым блоком, а страница
@@ -566,30 +566,24 @@ Object.assign(actions, {
     softHaptic();
     const box = el.closest('.screen-inner').querySelector('.fin-body');
     afterSegMove(() => {
-      swapContent(box, finBodyHtml(route), key === 'expenses' ? 'page-next' : 'page-prev', false);
+      swapContent(box, finBodyHtml(route), false);
       sizeEdits(box);
     });
   },
 
-  // Лента периодов: пилюля и список меняются на месте, лента не прыгает к началу.
-  // Новый итог въезжает с той стороны, куда переключили. Если при этом появляются или прячутся
-  // поля дат, блоки и так едут вверх-вниз — тогда итог просто сменяется, без движения вбок
+  // Лента периодов: пилюля и список меняются на месте, лента не прыгает к началу
   'set-period': ({ key }, el) => {
     const route = currentRoute();
-    const order = PERIODS.map((p) => p.key);
     const old = periodOf(route).key;
-    const from = order.indexOf(old);
-    const to = order.indexOf(key);
-    if (from === to) return;
+    if (old === key) return;
     route.period = key;
     route.page = 0;
     const chips = el.closest('.chips');
     chips.querySelectorAll('.chip').forEach((chip) => chip.classList.toggle('active', chip === el));
     centerChip(chips, true);
     const inner = el.closest('.screen-inner');
-    const rangeMoves = key === 'custom' || old === 'custom';
-    if (rangeMoves) toggleRange(inner, key === 'custom');
-    swapPeriod(inner, route, rangeMoves ? 'list-swap' : to > from ? 'page-next' : 'page-prev');
+    if (key === 'custom' || old === 'custom') toggleRange(inner, key === 'custom');
+    swapPeriod(inner, route);
     softHaptic();
   },
 
@@ -608,7 +602,7 @@ Object.assign(actions, {
         const [fromPill, toPill] = card.querySelectorAll('.date-pill');
         setText(fromPill, fullDate(range.from));
         setText(toPill, fullDate(range.to));
-        swapPeriod(card.closest('.screen-inner'), route, 'list-swap');
+        swapPeriod(card.closest('.screen-inner'), route);
       },
     });
   },
