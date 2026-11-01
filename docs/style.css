@@ -438,6 +438,19 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .chip:active { transform: scale(0.96); transition-duration: .1s; }
 .chip.active { background: var(--inv-bg); color: var(--inv-fg); }
 .chip svg { flex: none; width: 17px; height: 17px; }
+/* Круглый плюсик в ленте балансов */
+.chip-plus {
+  flex: none; display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border-radius: 50%; background: var(--cell);
+  transition: transform .25s var(--soft);
+}
+.chip-plus:active { transform: scale(0.9); transition-duration: .1s; }
+.chip-plus svg { width: 20px; height: 20px; }
+
+/* Переключатель «Расходы / Баланс» вместо заголовка */
+.seg.fin-seg { margin-top: 0; border-radius: 26px; }
+.fin-seg .seg-pill, .fin-seg .seg-btn { border-radius: 23px; }
+.fin-seg .seg-btn { padding: 11px 2px; font-size: 16px; }
 
 /* Две даты своего периода */
 .range-card {
@@ -451,10 +464,19 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 
 /* Итог периода */
 .total-card {
-  margin-top: 14px; padding: 22px; border-radius: var(--r-block);
+  position: relative; margin-top: 14px; padding: 22px; border-radius: var(--r-block);
   background: linear-gradient(120deg, var(--total-from), var(--total-to));
 }
-.total-head { color: var(--muted); font-size: 15px; font-weight: 600; }
+.total-head { color: var(--muted); font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.more-btn + .total-head { padding-right: 34px; }
+/* Меню баланса: точная сумма, название, удаление */
+.more-btn {
+  position: absolute; top: 12px; right: 12px; display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border-radius: 50%; color: var(--muted);
+  transition: transform .25s var(--soft);
+}
+.more-btn:active { transform: scale(0.9); transition-duration: .1s; }
+.more-btn svg { width: 22px; height: 22px; fill: currentColor; }
 .total-sum {
   display: block; margin-top: 8px; font-size: 44px; font-weight: 700; line-height: 52px;
   letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap;
@@ -463,6 +485,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .total-sum.longer { font-size: 27px; }
 .total-sub { display: block; margin-top: 6px; color: var(--muted); font-size: 15px; }
 .actions.total-action { margin-top: 12px; }
+.bal-actions { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 
 /* Длинный список категорий в меню снизу прокручивается */
 #choice-opts { max-height: 60vh; overflow-y: auto; }
@@ -503,6 +526,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 
 /* Тонкие разделители с отступом слева, как в iOS */
 .group > .row + .row::before,
+.group > .row + .swipe .row::before,
 .swipe + .swipe .row::before {
   content: ''; position: absolute; top: 0; left: 18px; right: 0;
   height: 0.5px; background: var(--sep);
@@ -582,7 +606,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
   width: 100%; padding: 8px 8px 8px 14px; border-radius: var(--r-field);
   background: var(--field); color: var(--fg);
 }
-.date-pill { padding: 6px 12px; border-radius: 999px; background: var(--field); font-size: 15px; transition: opacity .2s ease; }
+.date-pill { min-width: 0; padding: 6px 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 999px; background: var(--field); font-size: 15px; transition: opacity .2s ease; }
 .sheet-date:active .date-pill { opacity: 0.6; transition-duration: .1s; }
 
 /* Календарь поверх окна ввода или экрана */

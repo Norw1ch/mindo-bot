@@ -27,7 +27,7 @@ const TABS = [
     icon: icon('<rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8.5 3v4M15.5 3v4M4 10h16M9 15.3l2 2 4-4"/>'),
   },
   {
-    key: 'money', label: 'Расходы', root: { name: 'money' },
+    key: 'money', label: 'Финансы', root: { name: 'money' },
     icon: icon('<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M6.5 6V5.5A2.5 2.5 0 0 1 9 3h8.5M3 10.5h18M16 15h2"/>'),
   },
   {

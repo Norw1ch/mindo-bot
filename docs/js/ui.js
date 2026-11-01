@@ -181,12 +181,12 @@ async function back() {
     closeDatePop(); // сначала закрываем календарь: введённая сумма не должна пропасть
     return;
   }
-  if (sheetResolve) {
-    closeSheet(null);
+  if (choiceResolve) { // меню может быть открыто поверх окна ввода
+    closeChoice(null);
     return;
   }
-  if (choiceResolve) {
-    closeChoice(null);
+  if (sheetResolve) {
+    closeSheet(null);
     return;
   }
   if (busy || stack.length < 2) return;
@@ -385,8 +385,9 @@ const CLIP_Y = window.CSS && CSS.supports('overflow-y', 'clip') ? 'clip' : 'hidd
 // Меняет содержимое блока: новое появляется с анимацией cls, а высота блока плавно
 // перетекает от старой к новой — то, что ниже, не прыгает.
 // Старое содержимое не пропадает мгновенно: его «призрак» плавно уезжает и гаснет поверх нового
-// (page-next — влево, page-prev — вправо, иначе просто гаснет)
-function swapContent(box, html, cls) {
+// (page-next — влево, page-prev — вправо, иначе просто гаснет).
+// smoothHeight: false — высота меняется сразу: если под блоком ничего нет, анимировать её незачем
+function swapContent(box, html, cls, smoothHeight = true) {
   const from = box.offsetHeight; // если прошлая анимация ещё идёт — это её текущая высота
   if (box.heightAnim) box.heightAnim.cancel();
   box.querySelectorAll('.swap-ghost').forEach((g) => g.remove()); // прошлый призрак, если не успел уйти
@@ -409,7 +410,7 @@ function swapContent(box, html, cls) {
     out.onfinish = () => ghost.remove();
   }
   const to = box.offsetHeight;
-  if (from === to || reduceMotion || !box.animate) return;
+  if (!smoothHeight || from === to || reduceMotion || !box.animate) return;
 
   box.style.overflowY = CLIP_Y;
   const anim = box.animate(
@@ -944,14 +945,17 @@ const sheet = document.getElementById('sheet');
 const sheetFields = document.getElementById('sheet-fields');
 let sheetInputs = [];
 let sheetDate = null; // строка «Дата», если она есть в окне
+let sheetPicks = [];  // строки выбора из списка
 let sheetResolve = null;
 let sheetTimer;
 
 // Показывает окно ввода с полями fields: [{ value, placeholder, max, multiline, optional, inputmode, check }].
 // inputmode: 'decimal' — цифровая клавиатура; check(value) — вернуть текст ошибки, если значение не подходит.
-// date: '2026-10-31' — добавить под полями строку «Дата» с этим днём; выбранный день будет последним в ответе.
+// date: '2026-10-31' — добавить под полями строку «Дата» с этим днём.
+// picks: [{ title, value, options: [{ key, label }] }] — строки выбора из списка (меню снизу).
+// Выбранные дата и пункты идут в ответе после полей, в этом же порядке.
 // Возвращает массив введённых строк или null при отмене
-function ask({ title, fields, date }) {
+function ask({ title, fields, date, picks = [] }) {
   clearTimeout(sheetTimer);
   closeSwipe();
   document.getElementById('sheet-title').textContent = title;
@@ -971,7 +975,8 @@ function ask({ title, fields, date }) {
     return el;
   });
   sheetDate = date ? dateField(date) : null;
-  sheetFields.replaceChildren(...sheetInputs, ...(sheetDate ? [sheetDate] : []));
+  sheetPicks = picks.map(pickField);
+  sheetFields.replaceChildren(...sheetInputs, ...(sheetDate ? [sheetDate] : []), ...sheetPicks);
   hideTabbar('sheet');
   sheetInputs.forEach((el) => { if (!el.dataset.multiline) autoGrow(el); });
   // Место окна выбираем, пока оно скрыто: оно сразу появляется там, где и останется
@@ -1106,14 +1111,18 @@ function saveSheet() {
       return;
     }
   }
-  closeSheet(sheetDate ? [...values, sheetDate.value] : values);
+  closeSheet([...values, ...(sheetDate ? [sheetDate.value] : []), ...sheetPicks.map((el) => el.value)]);
 }
 
 document.getElementById('sheet-save').addEventListener('click', saveSheet);
 document.getElementById('sheet-cancel').addEventListener('click', () => closeSheet(null));
 sheet.addEventListener('click', (e) => {
   // Строка «Дата» открывает и закрывает календарь; нажатие мимо открытого календаря — закрывает его
-  if (e.target.closest('.sheet-date')) {
+  const pickRow = e.target.closest('.sheet-pick');
+  if (pickRow) {
+    closeDatePop();
+    choosePick(pickRow);
+  } else if (e.target.closest('.sheet-date')) {
     if (datePopShown) closeDatePop();
     else pickSheetDate();
   } else if (datePopShown) {
@@ -1122,6 +1131,26 @@ sheet.addEventListener('click', (e) => {
     closeSheet(null); // нажатие на затемнённый фон — отмена
   }
 });
+
+// Строка выбора из списка в окне ввода: подпись слева, выбранный пункт справа
+function pickField(pick) {
+  const el = document.createElement('button');
+  const chosen = pick.options.find((o) => o.key === pick.value);
+  el.className = 'sheet-date sheet-pick';
+  el.value = pick.value;
+  el.pick = pick;
+  el.innerHTML = `<span>${esc(pick.title)}</span><span class="date-pill">${esc(chosen.label)}</span>`;
+  return el;
+}
+
+async function choosePick(el) {
+  sheetInputs.forEach((input) => input.blur()); // клавиатура закрыла бы меню
+  const { title, options } = el.pick;
+  const key = await choose({ title, options: options.map((o) => ({ ...o, checked: o.key === el.value })) });
+  if (!key) return;
+  el.value = key;
+  setText(el.querySelector('.date-pill'), options.find((o) => o.key === key).label);
+}
 
 // ---------- Выбор даты ----------
 // Календарь поверх окна ввода или экрана. Листается так же, как календарь привычек: стрелками

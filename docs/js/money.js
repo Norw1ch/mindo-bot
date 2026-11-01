@@ -1,12 +1,14 @@
+
 'use strict';
 
-// Модуль «Расходы»: траты по категориям, итог месяца, свои категории. Валюта — гривна
+// Модуль «Финансы», страница «Расходы»: траты по категориям, итог за период, свои категории.
+// Страница «Баланс» — в balance.js. Валюта — гривна
 
 // ---------- Данные ----------
 // mcats: [{id, name}] — категории, в ключе "mcats" (пока не менялись — берутся стандартные)
 // expenses.items: [{id, a, c, t, n}] — пачками в ключах exp_0, exp_1, …
 //   a — сумма в копейках (целое число, чтобы не было ошибок округления), c — id категории,
-//   t — когда (время в мс), n — комментарий
+//   t — когда (время в мс), n — комментарий, b — с какого баланса списан (если списан)
 
 const CURRENCY = '₴';
 const DEFAULT_CATS = [
@@ -68,7 +70,7 @@ function formatMoney(kop) {
     minimumFractionDigits: kop % 100 ? 2 : 0,
     maximumFractionDigits: 2,
   });
-  return `${text} ${CURRENCY}`;
+  return `${text.replace('-', '−')} ${CURRENCY}`;
 }
 
 // Сумма для правки: «1250,5»
@@ -157,6 +159,11 @@ function periodExpenses(route, catId) {
 
 function sum(list) {
   return list.reduce((s, e) => s + e.a, 0);
+}
+
+// Когда записать событие выбранного дня: сегодня — сейчас, другой день — полдень
+function dayMoment(day) {
+  return day === dayKey() ? Date.now() : keyToDate(day).setHours(12);
 }
 
 // Сумма расходов за сегодня, в копейках
@@ -299,15 +306,19 @@ function rangeHtml(route) {
     <button class="date-pill" data-act="pick-range" data-end="to">${fullDate(to)}</button>`;
 }
 
+// Длинная сумма в карточке пишется мельче
+function sumSize(text) {
+  return text.length > 13 ? ' longer' : text.length > 9 ? ' long' : '';
+}
+
 // Карточка итога периода
 function totalHtml(route) {
   const list = periodExpenses(route);
   const total = formatMoney(sum(list));
-  const size = total.length > 13 ? ' longer' : total.length > 9 ? ' long' : '';
   return `
     <div class="total-card">
       <p class="total-head">${t(periodOf(route).head)}</p>
-      <b class="total-sum${size}${takeFlash('total') ? ' swap' : ''}">${total}</b>
+      <b class="total-sum${sumSize(total)}${takeFlash('total') ? ' swap' : ''}">${total}</b>
       <span class="total-sub">${list.length ? plural(list.length, ['расход', 'расхода', 'расходов']) : t('Расходов нет')}</span>
     </div>`;
 }
@@ -366,13 +377,23 @@ function toggleRange(inner, show) {
   };
 }
 
-pagers.money = expenseListHtml;
+pagers.money = (route) => (route.view === 'balance' ? historyHtml(route) : expenseListHtml(route));
 pagers.mcat = expenseListHtml;
 
 // ---------- Экраны ----------
 
+// Две страницы «Финансов» на одной вкладке
+const FIN_VIEWS = [{ key: 'expenses', html: 'Расходы' }, { key: 'balance', html: 'Баланс' }];
+
 views.money = (route) => `
-  <h1>${t('Расходы')}</h1>
+  ${segHtml(FIN_VIEWS.map((v) => ({ ...v, html: t(v.html) })), route.view || 'expenses', 'set-fin-view', '', 'fin-seg')}
+  <div class="fin-body paged">${finBodyHtml(route)}</div>`;
+
+function finBodyHtml(route) {
+  return route.view === 'balance' ? balancePageHtml(route) : expensesPageHtml(route);
+}
+
+const expensesPageHtml = (route) => `
   ${chipsHtml(route)}
   <div class="range-card${periodOf(route).key === 'custom' ? '' : ' hidden'}">${rangeHtml(route)}</div>
   <div class="after-range">
@@ -417,6 +438,11 @@ views.expense = (route) => {
         <span class="meta${takeFlash('date:' + e.id) ? ' swap' : ''}">${dayLabel(dayKey(new Date(e.t)))}</span>
         ${CHEVRON}
       </button>
+      ${accounts.items.length ? `<button class="row" data-act="exp-account" data-id="${e.id}">
+        <span class="title">${t('Откуда списать')}</span>
+        <span class="meta${takeFlash('acc:' + e.id) ? ' swap' : ''}">${accountName(e.b) || t('Не списывать')}</span>
+        ${CHEVRON}
+      </button>` : ''}
     </div>
     <div class="group">
       <button class="row danger" data-act="delete-expense" data-id="${e.id}">${t('Удалить расход')}</button>
@@ -503,6 +529,7 @@ Object.assign(actions, {
         { placeholder: t('Комментарий — необязательно'), max: NOTE_MAX, optional: true },
       ],
       date: dayKey(),
+      picks: accounts.items.length ? [accountPick(t('Откуда списать'), lastPaidFrom() || 'none', t('Не списывать'))] : [],
     });
     if (!res) return;
     const catId = await pickCat(t('Категория'), null);
@@ -511,9 +538,8 @@ Object.assign(actions, {
       return;
     }
     const day = res[2];
-    // Другой день — полдень, как при смене даты у готового расхода
-    const time = day === dayKey() ? Date.now() : keyToDate(day).setHours(12);
-    const expense = { id: newId(), a: parseAmount(res[0]), c: catId, t: time, n: res[1] };
+    const expense = { id: newId(), a: parseAmount(res[0]), c: catId, t: dayMoment(day), n: res[1] };
+    if (res[3] && res[3] !== 'none') expense.b = res[3];
     flash = new Set([expense.id, 'total']); // новая строка появляется, итог мягко меняется
     const route = currentRoute();
     showExpenseDay(route, day);
@@ -523,6 +549,19 @@ Object.assign(actions, {
       return expenses.save();
     });
     if (ok) toast(`${formatMoney(expense.a)} · ${findCat(catId).name}`);
+  },
+
+  // Переключатель «Расходы / Баланс». Под страницей ничего нет — высоту не анимируем
+  'set-fin-view': ({ key }, el) => {
+    const route = currentRoute();
+    if ((route.view || 'expenses') === key) return;
+    route.view = key;
+    route.page = 0;
+    moveSeg(el.closest('.seg'), key);
+    softHaptic();
+    const box = el.closest('.screen-inner').querySelector('.fin-body');
+    swapContent(box, finBodyHtml(route), key === 'balance' ? 'page-next' : 'page-prev', false);
+    sizeEdits(box);
   },
 
   // Лента периодов: пилюля и список меняются на месте, лента не прыгает к началу.
@@ -581,6 +620,20 @@ Object.assign(actions, {
     flash = 'cat:' + id;
     await commit(() => {
       e.c = catId;
+      return expenses.save();
+    });
+  },
+
+  // С какого баланса списан расход: баланс пересчитается сам
+  'exp-account': async ({ id }) => {
+    const e = expenses.find(id);
+    const { title, value, options } = accountPick(t('Откуда списать'), e.b || 'none', t('Не списывать'));
+    const picked = await choose({ title, options: options.map((o) => ({ ...o, checked: o.key === value })) });
+    if (!picked || picked === value) return;
+    flash = 'acc:' + id;
+    await commit(() => {
+      if (picked === 'none') delete e.b;
+      else e.b = picked;
       return expenses.save();
     });
   },
