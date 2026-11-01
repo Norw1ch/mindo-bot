@@ -192,12 +192,18 @@ function historyHtml(route) {
   }, (item, n) => (item.k ? moveRowHtml(item, route, n) : spentRowHtml(item, route)));
 }
 
+// Всё, что под лентой балансов: сумма, кнопки и история
+function accountBlockHtml(route) {
+  return `
+    ${balanceCardHtml(route)}
+    ${balanceActionsHtml()}
+    <div class="paged">${historyHtml(route)}</div>`;
+}
+
 function balancePageHtml(route) {
   return `
     ${accountChipsHtml(route)}
-    <div class="total-box paged">${balanceCardHtml(route)}</div>
-    ${balanceActionsHtml()}
-    <div class="ops-box paged">${historyHtml(route)}</div>`;
+    <div class="account-box paged">${accountBlockHtml(route)}</div>`;
 }
 
 // ---------- Действия ----------
@@ -243,7 +249,7 @@ function checkExact(text) {
 }
 
 Object.assign(actions, {
-  // Лента балансов: итог и история меняются на месте, лента не прыгает к началу
+  // Лента балансов: блок под ней меняется целиком, лента не прыгает к началу
   'set-account': ({ key }, el) => {
     const route = currentRoute();
     const id = key === 'all' ? null : key;
@@ -253,9 +259,7 @@ Object.assign(actions, {
     const chips = el.closest('.chips');
     chips.querySelectorAll('.chip').forEach((chip) => chip.classList.toggle('active', chip === el));
     centerChip(chips, true);
-    const inner = el.closest('.screen-inner');
-    swapContent(inner.querySelector('.total-box'), balanceCardHtml(route));
-    swapContent(inner.querySelector('.ops-box'), historyHtml(route));
+    swapContent(el.closest('.screen-inner').querySelector('.account-box'), accountBlockHtml(route));
     softHaptic();
   },
 

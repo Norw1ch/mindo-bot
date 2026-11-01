@@ -334,10 +334,19 @@ function periodHtml(route) {
     </div>`;
 }
 
-// Период сменился: итог и списки меняются мягко, кнопка между ними стоит на месте
+// Всё, что под лентой периодов: итог, кнопка и списки
+function periodBlockHtml(route) {
+  return `
+    ${totalHtml(route)}
+    <div class="actions total-action">
+      <button class="btn primary" data-act="add-expense">➕ ${t('Добавить расход')}</button>
+    </div>
+    ${periodHtml(route)}`;
+}
+
+// Период сменился: блок меняется целиком, вместе с кнопкой
 function swapPeriod(inner, route) {
-  swapContent(inner.querySelector('.total-box'), totalHtml(route));
-  swapContent(inner.querySelector('.month-box'), periodHtml(route));
+  swapContent(inner.querySelector('.period-box'), periodBlockHtml(route));
 }
 
 // Поля дат появляются и прячутся одним сдвигом: всё, что ниже, едет единым блоком, а страница
@@ -402,11 +411,7 @@ const expensesPageHtml = (route) => `
   ${chipsHtml(route)}
   <div class="range-card${periodOf(route).key === 'custom' ? '' : ' hidden'}">${rangeHtml(route)}</div>
   <div class="after-range">
-    <div class="total-box paged">${totalHtml(route)}</div>
-    <div class="actions total-action">
-      <button class="btn primary" data-act="add-expense">➕ ${t('Добавить расход')}</button>
-    </div>
-    <div class="month-box paged">${periodHtml(route)}</div>
+    <div class="period-box paged">${periodBlockHtml(route)}</div>
     <div class="group">
       <button class="row" data-act="open-mcats"><span class="title">${t('Категории')}</span><span class="meta">${mcats.length}</span>${CHEVRON}</button>
     </div>
