@@ -382,8 +382,10 @@ function restartAnim(el, cls) {
 // Обрезать по вертикали, не трогая края по бокам (в старых браузерах — просто обрезать)
 const CLIP_Y = window.CSS && CSS.supports('overflow-y', 'clip') ? 'clip' : 'hidden';
 
-const SWAP_OUT_MS = 70; // блок гаснет
-const SWAP_IN_MS = 130; // и проявляется с новым содержимым: вместе 0,2 с
+// Блок гаснет и проявляется с новым содержимым: вместе 0,2 с. Угасание короче 0,1 с на телефоне
+// не успевает отрисоваться: то, чего нет на новой странице, просто стоит и вдруг исчезает
+const SWAP_OUT_MS = 100;
+const SWAP_IN_MS = 100;
 const HEIGHT_MS = 400;
 const HEIGHT_EASE = 'cubic-bezier(.45, 0, .15, 1)'; // как у таблетки: мягкий старт и остановка
 
@@ -401,7 +403,7 @@ function swapContent(box, html, { smoothHeight = true, done } = {}) {
   if (box.fadeOut) return; // блок уже гаснет — покажем самое свежее
   const start = Number(window.getComputedStyle(box).opacity); // могло ещё идти проявление
   if (box.fadeIn) box.fadeIn.cancel();
-  const out = box.animate([{ opacity: start }, { opacity: 0 }], { duration: SWAP_OUT_MS, easing: 'ease-out', fill: 'forwards' });
+  const out = box.animate([{ opacity: start }, { opacity: 0 }], { duration: SWAP_OUT_MS, easing: 'linear', fill: 'forwards' });
   box.fadeOut = out;
   out.onfinish = () => {
     box.fadeOut = null;
