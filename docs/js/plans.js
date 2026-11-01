@@ -397,7 +397,7 @@ async function completeRecurring(idea, seg) {
   const route = currentRoute();
   if (route.name !== 'idea' || route.id !== idea.id) return; // уже ушли с карточки
   moveSeg(seg, 'new');
-  await wait(520);
+  await wait(420);
   flash = 'due:' + idea.id;
   refresh();
 }

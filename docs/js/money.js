@@ -377,7 +377,7 @@ function toggleRange(inner, show) {
   };
 }
 
-pagers.money = (route) => (route.view === 'balance' ? historyHtml(route) : expenseListHtml(route));
+pagers.money = (route) => (finView(route) === 'balance' ? historyHtml(route) : expenseListHtml(route));
 pagers.mcat = expenseListHtml;
 
 // ---------- Экраны ----------
@@ -385,12 +385,17 @@ pagers.mcat = expenseListHtml;
 // Две страницы «Финансов» на одной вкладке
 const FIN_VIEWS = [{ key: 'balance', html: 'Баланс' }, { key: 'expenses', html: 'Расходы' }];
 
+// Какая страница открыта; при входе в раздел — «Баланс»
+function finView(route) {
+  return route.view || 'balance';
+}
+
 views.money = (route) => `
-  ${segHtml(FIN_VIEWS.map((v) => ({ ...v, html: t(v.html) })), route.view || 'expenses', 'set-fin-view', '', 'fin-seg')}
+  ${segHtml(FIN_VIEWS.map((v) => ({ ...v, html: t(v.html) })), finView(route), 'set-fin-view', '', 'fin-seg')}
   <div class="fin-body paged">${finBodyHtml(route)}</div>`;
 
 function finBodyHtml(route) {
-  return route.view === 'balance' ? balancePageHtml(route) : expensesPageHtml(route);
+  return finView(route) === 'balance' ? balancePageHtml(route) : expensesPageHtml(route);
 }
 
 const expensesPageHtml = (route) => `
@@ -554,7 +559,7 @@ Object.assign(actions, {
   // Переключатель «Расходы / Баланс». Под страницей ничего нет — высоту не анимируем
   'set-fin-view': ({ key }, el) => {
     const route = currentRoute();
-    if ((route.view || 'expenses') === key) return;
+    if (finView(route) === key) return;
     route.view = key;
     route.page = 0;
     moveSeg(el.closest('.seg'), key);
