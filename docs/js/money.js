@@ -383,7 +383,7 @@ pagers.mcat = expenseListHtml;
 // ---------- Экраны ----------
 
 // Две страницы «Финансов» на одной вкладке
-const FIN_VIEWS = [{ key: 'expenses', html: 'Расходы' }, { key: 'balance', html: 'Баланс' }];
+const FIN_VIEWS = [{ key: 'balance', html: 'Баланс' }, { key: 'expenses', html: 'Расходы' }];
 
 views.money = (route) => `
   ${segHtml(FIN_VIEWS.map((v) => ({ ...v, html: t(v.html) })), route.view || 'expenses', 'set-fin-view', '', 'fin-seg')}
@@ -560,8 +560,10 @@ Object.assign(actions, {
     moveSeg(el.closest('.seg'), key);
     softHaptic();
     const box = el.closest('.screen-inner').querySelector('.fin-body');
-    swapContent(box, finBodyHtml(route), key === 'balance' ? 'page-next' : 'page-prev', false);
-    sizeEdits(box);
+    afterSegMove(() => {
+      swapContent(box, finBodyHtml(route), key === 'expenses' ? 'page-next' : 'page-prev', false);
+      sizeEdits(box);
+    });
   },
 
   // Лента периодов: пилюля и список меняются на месте, лента не прыгает к началу.

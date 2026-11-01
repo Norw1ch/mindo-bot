@@ -397,7 +397,7 @@ async function completeRecurring(idea, seg) {
   const route = currentRoute();
   if (route.name !== 'idea' || route.id !== idea.id) return; // уже ушли с карточки
   moveSeg(seg, 'new');
-  await wait(450);
+  await wait(520);
   flash = 'due:' + idea.id;
   refresh();
 }
@@ -640,7 +640,7 @@ Object.assign(actions, {
     moveSeg(el.closest('.seg'), key);
     softHaptic();
     const box = el.closest('.screen-inner').querySelector('.paged');
-    swapContent(box, ideaListHtml(route), order.indexOf(key) > order.indexOf(old) ? 'page-next' : 'page-prev');
+    afterSegMove(() => swapContent(box, ideaListHtml(route), order.indexOf(key) > order.indexOf(old) ? 'page-next' : 'page-prev'));
   },
 
   // Статус в карточке: сохраняем сразу, экран не перерисовываем, чтобы таблетка плавно переехала

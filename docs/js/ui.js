@@ -492,6 +492,12 @@ function moveSeg(seg, key) {
   buttons.forEach((b) => b.classList.toggle('active', b.dataset.key === key));
 }
 
+// Тяжёлая работа после нажатия на переключатель: сначала таблетка трогается с места,
+// и только потом перерисовка, иначе она отнимет у анимации первые кадры
+function afterSegMove(work) {
+  requestAnimationFrame(() => requestAnimationFrame(work));
+}
+
 // ---------- Страницы по 8 ----------
 
 const PAGE_SIZE = 8;
