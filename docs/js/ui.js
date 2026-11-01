@@ -382,7 +382,7 @@ function restartAnim(el, cls) {
 // Обрезать по вертикали, не трогая края по бокам (в старых браузерах — просто обрезать)
 const CLIP_Y = window.CSS && CSS.supports('overflow-y', 'clip') ? 'clip' : 'hidden';
 
-const SWAP_OUT_MS = 130; // сколько гаснет старое; новое проявляется следом (.fade-swap в стилях)
+const SWAP_OUT_MS = 80; // сколько гаснет старое; новое проявляется следом (.fade-swap в стилях)
 const HEIGHT_MS = 400;
 const HEIGHT_EASE = 'cubic-bezier(.45, 0, .15, 1)'; // как у таблетки: мягкий старт и остановка
 
