@@ -507,6 +507,75 @@ function afterSegMove(work) {
   requestAnimationFrame(() => requestAnimationFrame(work));
 }
 
+// Таблетку можно тянуть пальцем: она едет за ним, подпись под ней загорается сразу.
+// Отпустил — таблетка доезжает до ближайшего сегмента, и он выбирается, как при нажатии
+const SEG_SNAP = 'transform .3s cubic-bezier(.2, .8, .2, 1)'; // доводка: с ходу, без разгона
+let segDrag = null;
+
+document.addEventListener('pointerdown', (e) => {
+  const btn = e.target.closest('.seg-btn.active');
+  if (!btn || busy || segDrag) return;
+  if (e.clientX <= EDGE_ZONE && edgeAllowed()) return; // у левого края — это жест «назад»
+  const seg = btn.closest('.seg');
+  const pill = seg.querySelector('.seg-pill');
+  const buttons = [...seg.querySelectorAll('.seg-btn')];
+  const k = buttons.indexOf(btn);
+  // Таблетка может ещё ехать после нажатия — тянем её с того места, где она сейчас
+  const shift = getComputedStyle(pill).transform;
+  segDrag = {
+    seg, pill, buttons, id: e.pointerId, x0: e.clientX, y0: e.clientY, k0: k, k,
+    from: shift === 'none' ? 0 : new DOMMatrixReadOnly(shift).m41,
+    w: pill.getBoundingClientRect().width, active: false,
+  };
+});
+
+document.addEventListener('pointermove', (e) => {
+  const d = segDrag;
+  if (!d || e.pointerId !== d.id) return;
+  const dx = e.clientX - d.x0;
+  if (!d.active) {
+    const dy = e.clientY - d.y0;
+    if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+    if (Math.abs(dy) >= Math.abs(dx)) { // вверх-вниз — это прокрутка страницы
+      segDrag = null;
+      return;
+    }
+    d.active = true;
+    clearTimeout(d.pill.snapTimer);
+    d.pill.style.transition = 'none';
+    try { d.seg.setPointerCapture(e.pointerId); } catch { /* не страшно */ }
+  }
+  const x = Math.min(Math.max(d.from + dx, 0), (d.buttons.length - 1) * d.w);
+  d.pill.style.transform = `translateX(${x}px)`;
+  const k = Math.round(x / d.w);
+  if (k !== d.k) {
+    d.k = k;
+    d.buttons.forEach((b, i) => b.classList.toggle('active', i === k));
+    softHaptic();
+  }
+});
+
+function endSegDrag(e) {
+  const d = segDrag;
+  if (!d || e.pointerId !== d.id) return;
+  segDrag = null;
+  if (!d.active) return; // это было нажатие — его разберёт click
+  suppressClick = true;
+  // Жест сорвался или приложение занято — таблетка возвращается на прежнее место
+  const btn = d.buttons[e.type === 'pointerup' && !busy ? d.k : d.k0];
+  d.pill.style.transition = SEG_SNAP;
+  d.pill.style.transform = '';
+  d.pill.snapTimer = setTimeout(() => { d.pill.style.transition = ''; }, 320);
+  if (btn === d.buttons[d.k0] || !d.seg.isConnected) {
+    moveSeg(d.seg, d.buttons[d.k0].dataset.key);
+    return;
+  }
+  actions[btn.dataset.act](btn.dataset, btn);
+}
+
+document.addEventListener('pointerup', endSegDrag);
+document.addEventListener('pointercancel', endSegDrag);
+
 // ---------- Страницы по 8 ----------
 
 const PAGE_SIZE = 8;
