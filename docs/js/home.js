@@ -121,9 +121,12 @@ Object.assign(actions, {
     if (await actions['new-note']()) toast(t('Заметка сохранена'));
   },
 
-  'open-tab': ({ tab }) => {
+  // Раздел из меню — переход на его вкладку; раздел не из меню (Списки) открывается здесь же, с «Назад»
+  'open-tab': ({ tab: key }) => {
     softHaptic();
-    switchTab(tab);
+    const tab = TABS.find((item) => item.key === key);
+    if (tab.menu === false) go({ ...tab.root });
+    else switchTab(key);
   },
 
   // Раздел создаётся в Задачах: сразу на их главный экран, там он и появится.

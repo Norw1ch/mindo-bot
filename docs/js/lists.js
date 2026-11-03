@@ -101,9 +101,6 @@ views.lists = () => {
   const rows = all.map(listRowHtml).join('');
   return `
     ${headHtml(all.length ? plural(all.length, ['список', 'списка', 'списков']) : t('Списков пока нет'), t('Списки'))}
-    <div class="actions">
-      <button class="btn primary" data-act="new-list">${btnLabel('plus', t('Новый список'))}</button>
-    </div>
     ${rows ? `<div class="group">${rows}</div>` : ''}`;
 };
 
@@ -201,6 +198,10 @@ async function settleMoves(listId) {
 }
 
 // ---------- Действия ----------
+
+fabs.lists = () => actions['new-list']();
+// Внутри списка — сразу в поле «Добавить пункт»
+fabs.list = () => screens[screens.length - 1].querySelector('.quick-add').focus();
 
 Object.assign(actions, {
   'new-list': async () => {

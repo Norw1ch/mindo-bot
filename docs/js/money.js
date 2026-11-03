@@ -339,17 +339,14 @@ function periodHtml(route) {
     </div>`;
 }
 
-// Всё, что под лентой периодов: итог, кнопка и списки
+// Всё, что под лентой периодов: итог и списки
 function periodBlockHtml(route) {
   return `
     ${totalHtml(route)}
-    <div class="actions total-action">
-      <button class="btn primary" data-act="add-expense">${btnLabel('plus', t('Добавить расход'))}</button>
-    </div>
     ${periodHtml(route)}`;
 }
 
-// Период сменился: блок меняется целиком, вместе с кнопкой
+// Период сменился: блок меняется целиком
 function swapPeriod(inner, route) {
   swapContent(inner.querySelector('.period-box'), periodBlockHtml(route));
 }
@@ -480,7 +477,7 @@ views.mcats = () => {
   return `
     ${headHtml(plural(mcats.length, ['категория', 'категории', 'категорий']), t('Категории'))}
     <div class="actions">
-      <button class="btn primary" data-act="new-mcat">${btnLabel('plus', t('Новая категория'))}</button>
+      <button class="btn" data-act="new-mcat">${btnLabel('plus', t('Новая категория'))}</button>
     </div>
     <div class="group">${rows}</div>
     <p class="foot-note">${t('Нажми, чтобы переименовать; свайп влево — удалить')}</p>`;
@@ -505,6 +502,13 @@ editors['exp-note'] = {
 };
 
 // ---------- Действия ----------
+
+// «+»: на «Расходах» — расход, на «Балансе» — пополнение, а если балансов ещё нет — первый баланс
+fabs.money = (route) => {
+  if (finView(route) === 'expenses') actions['add-expense']();
+  else actions[accounts.items.length ? 'bal-add' : 'new-account']();
+};
+fabs.mcat = () => actions['add-expense']();
 
 // Новая категория: спросить название, сохранить, вернуть её id (или null при отмене)
 async function createCat() {

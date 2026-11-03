@@ -96,9 +96,6 @@ views.notes = (route) => {
 
   return `
     ${headHtml(total ? plural(total, ['заметка', 'заметки', 'заметок']) : t('Заметок пока нет'), t('Заметки'))}
-    <div class="actions">
-      <button class="btn primary" data-act="new-note">${btnLabel('plus', t('Новая заметка'))}</button>
-    </div>
     ${total ? searchHtml(route.q, t('Поиск по заметкам')) : ''}
     <div class="search-results paged${searching ? '' : ' hidden'}">${searching ? notesSearchHtml(route) : ''}</div>
     <div class="search-body${searching ? ' hidden' : ''}">
@@ -149,6 +146,8 @@ editors['note-text'] = {
 };
 
 // ---------- Действия ----------
+
+fabs.notes = () => actions['new-note']();
 
 function noteFields(note = { title: '', text: '' }) {
   return [

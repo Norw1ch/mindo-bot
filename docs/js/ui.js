@@ -84,6 +84,8 @@ async function commit(change, after = refresh) {
 
 const root = document.getElementById('app');
 const tabbar = document.getElementById('tabbar');
+const fab = document.getElementById('fab');
+const fabs = {}; // название экрана → что делает «+» на нём; нет записи — «+» не показываем
 const panes = {}; // вкладка → { el, stack, screens }
 let currentTab = null;
 let app = null;
@@ -100,9 +102,31 @@ function currentRoute() {
 }
 
 function renderTabbar() {
-  tabbar.innerHTML = TABS.map((tab) => `
-    <button class="tab${tab.key === currentTab ? ' active' : ''}" data-tab="${tab.key}">${tab.icon}<span>${t(tab.label)}</span></button>`).join('');
+  const menu = TABS.filter((tab) => tab.menu !== false);
+  tabbar.style.setProperty('--n', menu.length);
+  tabbar.innerHTML = '<span class="tab-pill"></span>' + menu.map((tab) => `
+    <button class="tab" data-tab="${tab.key}">${tab.icon}<span>${t(tab.label)}</span></button>`).join('');
+  markTab(currentTab);
+  fab.innerHTML = icon(ICONS.plus);
+  fab.setAttribute('aria-label', t('Добавить'));
 }
+
+// Капсула переезжает под выбранную вкладку
+function markTab(key) {
+  const tabs = [...tabbar.querySelectorAll('.tab')];
+  tabbar.style.setProperty('--k', Math.max(0, tabs.findIndex((b) => b.dataset.tab === key)));
+  tabs.forEach((b) => b.classList.toggle('active', b.dataset.tab === key));
+}
+
+// «+» есть только там, где на этом экране можно что-то добавить
+function updateFab() {
+  fab.classList.toggle('shown', Boolean(fabs[currentRoute().name]));
+}
+
+actions.fab = () => {
+  const add = fabs[currentRoute().name];
+  if (add) add(currentRoute());
+};
 
 // Язык сменился: подписи меню и текущий экран рисуем заново, а другие вкладки соберутся при открытии
 function relabelApp() {
@@ -157,7 +181,7 @@ function switchTab(key) {
   }
   app.classList.add('active');
   restartAnim(app, 'tab-in');
-  tabbar.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === key));
+  markTab(key);
   updateBackButton();
 }
 
@@ -395,6 +419,7 @@ function refresh() {
 }
 
 function updateBackButton() {
+  updateFab(); // экран сменился — заодно и «+»
   if (!inTelegram) return;
   if (stack.length > 1 || sheetResolve || choiceResolve) tg.BackButton.show();
   else tg.BackButton.hide();

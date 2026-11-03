@@ -14,12 +14,16 @@
   --field: rgba(118, 118, 128, 0.12);
   --shade: rgba(0, 0, 0, 0.12);
   --backdrop: rgba(0, 0, 0, 0.25);
-  --bar: rgba(249, 249, 249, 0.94);  /* панель вкладок */
+  --bar: rgba(249, 249, 249, 0.9);   /* меню-пилюля */
+  --bar-line: rgba(60, 60, 67, 0.12); /* его рамка */
+  --bar-pill: #e5e5ea;                /* капсула под выбранной вкладкой */
+  --page-clear: rgba(242, 242, 247, 0); /* фон экрана, но прозрачный — для затемнения над меню */
 
   /* Нижний отступ под «полоску» iPhone: берём больший из системного и телеграмовского */
   --safe-b: max(env(safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px));
-  --tabbar-h: calc(54px + var(--safe-b));
-  --tabbar-radius: 28px;
+  /* Меню плавает над нижним краем, на iPhone — над полоской */
+  --menu-b: max(20px, var(--safe-b));
+  --menu-h: 64px;
 
   /* Скругления одни на всё приложение: блоки и поля. Кнопки — пилюли (радиус в половину высоты) */
   --r-block: 28px;
@@ -48,7 +52,10 @@
   --field: rgba(118, 118, 128, 0.24);
   --shade: rgba(0, 0, 0, 0.5);
   --backdrop: rgba(0, 0, 0, 0.5);
-  --bar: rgba(22, 22, 22, 0.94);
+  --bar: rgba(28, 28, 30, 0.9);
+  --bar-line: #2c2c2e;
+  --bar-pill: #3a3a3c;
+  --page-clear: rgba(0, 0, 0, 0);
   --dash: #3a3a3c;
   --total-from: #252527;
   --total-to: #3a3a3c;
@@ -74,38 +81,66 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 
 /* ---------- Вкладки ---------- */
 /* У каждой вкладки свой слой .pane со своей стопкой экранов; виден только активный */
-/* Экран заходит под панель вкладок на её скругление: в углах панели видно содержимое, а не пустоту */
-#app { position: fixed; top: 0; left: 0; right: 0; bottom: calc(var(--tabbar-h) - var(--tabbar-radius)); overflow: hidden; }
+/* Экран во всю высоту: содержимое уходит под плавающее меню */
+#app { position: fixed; inset: 0; overflow: hidden; }
 .pane { position: absolute; inset: 0; overflow: hidden; visibility: hidden; }
 .pane.active { visibility: visible; }
 .pane.tab-in { animation: tab-in .32s ease; }
 
+/* Нижнее меню — плавающая пилюля с размытием под ней */
 .tabbar {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
-  display: flex; height: var(--tabbar-h); padding: 5px 4px var(--safe-b);
-  border-radius: var(--tabbar-radius) var(--tabbar-radius) 0 0;
+  position: fixed; left: 16px; right: 16px; bottom: var(--menu-b); z-index: 5;
+  display: grid; grid-template-columns: repeat(var(--n), 1fr);
+  max-width: 560px; height: var(--menu-h); margin: 0 auto; padding: 6px;
+  border: 1px solid var(--bar-line); border-radius: 32px;
   background: var(--bar);
-  -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
-  box-shadow: 0 -0.5px 0 var(--sep);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  transition: opacity .2s ease;
 }
-/* Пока открыта клавиатура — панель тихо гаснет на месте, без движения,
-   а экран занимает её место (иначе над клавиатурой остаётся пустая полоса) */
-.tabbar { transition: opacity .2s ease; }
-body.no-tabbar #app { bottom: 0; }
-body.no-tabbar .tabbar {
+/* Капсула под выбранной вкладкой переезжает, как таблетка переключателя */
+.tab-pill {
+  position: absolute; top: 6px; bottom: 6px; left: 6px;
+  width: calc((100% - 12px) / var(--n)); border-radius: 25px;
+  background: var(--bar-pill);
+  transform: translateX(calc(var(--k) * 100%));
+  transition: transform .4s cubic-bezier(.45, 0, .15, 1);
+}
+/* Над меню содержимое мягко уходит в фон */
+.menu-fade {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 4;
+  height: calc(var(--menu-b) + 100px); pointer-events: none;
+  background: linear-gradient(var(--page-clear), var(--page));
+  transition: opacity .2s ease;
+}
+/* Кнопка «+» справа над меню */
+.fab {
+  position: fixed; z-index: 6; right: 20px; bottom: calc(var(--menu-b) + var(--menu-h) + 16px);
+  display: flex; align-items: center; justify-content: center;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--inv-bg); color: var(--inv-fg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.2);
+  opacity: 0; visibility: hidden; pointer-events: none; transform: scale(0.6);
+  transition: opacity .2s ease, transform .3s var(--soft), visibility 0s linear .3s;
+}
+.fab.shown { opacity: 1; visibility: visible; pointer-events: auto; transform: none; transition: opacity .2s ease, transform .3s var(--soft); }
+.fab.shown:active { transform: scale(0.92); transition-duration: .1s; }
+.fab svg { width: 26px; height: 26px; stroke-width: 2.2; }
+/* Пока открыта клавиатура — меню, затемнение и «+» тихо гаснут на месте, без движения */
+body.no-tabbar .tabbar, body.no-tabbar .menu-fade, body.no-tabbar .fab.shown {
   opacity: 0; visibility: hidden; pointer-events: none;
   transition: opacity .12s ease, visibility 0s linear .12s;
 }
 .tab {
-  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  position: relative; z-index: 1; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   color: var(--gray); font-size: 11px; font-weight: 500; white-space: nowrap;
   transition: color .25s ease;
 }
-.tab svg { width: 26px; height: 26px; transition: transform .3s var(--soft); }
+.tab svg { width: 24px; height: 24px; transition: transform .3s var(--soft); }
 .tab:active svg { transform: scale(0.86); transition-duration: .1s; }
 .tab.active { color: var(--fg); }
 .tab.active svg { stroke-width: 2.1; }
-@media (max-width: 350px) { .tab { font-size: 10px; } } /* шесть подписей в ряд на самых узких экранах */
+@media (max-width: 350px) { .tab { font-size: 10px; } } /* длинные подписи на самых узких экранах */
 
 /* ---------- Экраны-слои ---------- */
 .screen {
@@ -115,7 +150,7 @@ body.no-tabbar .tabbar {
 }
 .screen ~ .screen { box-shadow: -12px 0 32px rgba(0, 0, 0, 0.14); } /* тень от верхнего слоя */
 .screen.covered { visibility: hidden; }
-.screen-inner { max-width: 560px; margin: 0 auto; padding: 16px 16px calc(48px + var(--tabbar-radius)); }
+.screen-inner { max-width: 560px; margin: 0 auto; padding: 16px 16px calc(var(--menu-b) + var(--menu-h) + 96px); }
 
 /* Затемнение нижнего экрана во время перехода */
 .shade { position: absolute; inset: 0; background: var(--shade); pointer-events: none; }
@@ -435,7 +470,6 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .tile-text b { display: block; font-size: 16px; font-weight: 700; line-height: 20px; white-space: nowrap; }
 .tile-text span { display: block; color: var(--gray); font-size: 13px; line-height: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tile.add { border: 1px dashed var(--dash); background: transparent; color: var(--gray); }
-.tile.wide { grid-column: span 2; }
 @media (max-width: 350px) { .tile { padding: 13px 12px; } }
 
 /* ---------- Расходы ---------- */
@@ -508,7 +542,6 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .total-sum.long { font-size: 34px; }
 .total-sum.longer { font-size: 27px; }
 .total-sub { display: block; margin-top: 6px; color: var(--muted); font-size: 15px; }
-.actions.total-action { margin-top: 12px; }
 .bal-actions { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 
 /* Длинный список категорий в меню снизу прокручивается */
@@ -706,7 +739,7 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 
 /* ---------- Всплывающая подсказка ---------- */
 .toast {
-  position: fixed; z-index: 20; left: 50%; bottom: calc(var(--tabbar-h) + 14px); transform: translate(-50%, 16px) scale(0.96);
+  position: fixed; z-index: 20; left: 50%; bottom: calc(var(--menu-b) + var(--menu-h) + 88px); transform: translate(-50%, 16px) scale(0.96);
   padding: 11px 20px; border-radius: 999px;
   background: var(--inv-bg); color: var(--inv-fg); font-size: 15px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);

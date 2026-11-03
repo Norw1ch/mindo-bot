@@ -437,7 +437,7 @@ views.main = (route) => {
       ${today}
       ${sections}
       <div class="actions">
-        <button class="btn primary" data-act="new-section">${btnLabel('plus', t('Новый раздел'))}</button>
+        <button class="btn" data-act="new-section">${btnLabel('plus', t('Новый раздел'))}</button>
         <button class="btn" data-act="open-archive">${btnLabel('archive', t('Выполненные'))}</button>
       </div>
     </div>`;
@@ -453,9 +453,6 @@ views.section = (route) => {
   return `
     ${headHtml(active ? t('{0} в работе', plural(active, ['задача', 'задачи', 'задач'])) : t('Активных задач нет'), esc(s.name),
       { titleCls: takeFlash(s.id) ? 'swap' : '' })}
-    <div class="actions">
-      <button class="btn primary" data-act="add-idea" data-id="${s.id}">${btnLabel('plus', t('Новая задача'))}</button>
-    </div>
     ${segHtml(FILTERS.map((f) => ({ ...f, html: t(f.html) })), filter, 'set-filter')}
     <div class="paged">${ideaListHtml(route)}</div>
     <div class="group">
@@ -537,6 +534,13 @@ views.agenda = (route) => {
 };
 
 // ---------- Действия ----------
+
+// «+»: на главном экране и в «Сроках» — задача с выбором раздела, в разделе — сразу в него
+Object.assign(fabs, {
+  main: () => actions['quick-idea'](),
+  agenda: () => actions['quick-idea'](),
+  section: (route) => actions['add-idea']({ id: route.id }),
+});
 
 // Поля окна для плана: заголовок и необязательное описание
 function ideaFields(idea = { title: '', text: '' }) {

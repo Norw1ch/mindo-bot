@@ -406,9 +406,6 @@ views.habits = () => {
   const rows = [...habits.items].sort((a, b) => a.at - b.at).map(habitRowHtml).join('');
   return `
     ${headHtml(habitsSummary(), t('Привычки'), { lineCls: 'habits-sub' })}
-    <div class="actions">
-      <button class="btn primary" data-act="new-habit">${btnLabel('plus', t('Новая привычка'))}</button>
-    </div>
     ${rows ? `<div class="group">${rows}</div>` : ''}`;
 };
 
@@ -442,6 +439,8 @@ editors['habit-name'] = {
 };
 
 // ---------- Действия ----------
+
+fabs.habits = () => actions['new-habit']();
 
 // Поздравление на круглых сериях
 function cheer(h) {
