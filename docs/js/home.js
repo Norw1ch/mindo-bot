@@ -123,7 +123,7 @@ Object.assign(actions, {
 
   // Раздел из меню — переход на его вкладку; раздел не из меню (Списки) открывается здесь же, с «Назад»
   'open-tab': ({ tab: key }) => {
-    softHaptic();
+    haptic();
     const tab = TABS.find((item) => item.key === key);
     if (tab.menu === false) go({ ...tab.root });
     else switchTab(key);

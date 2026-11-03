@@ -500,11 +500,12 @@ Object.assign(actions, {
     const h = habits.find(id);
     toggleDay(h, dayNum());
     const done = isDone(h, dayNum());
+    if (done) successHaptic();
     el.classList.add('just');
     el.classList.toggle('checked', done);
     updateHabitRow(el.closest('.row'), h);
     setText(el.closest('.screen-inner').querySelector('.habits-sub'), habitsSummary());
-    const ok = await commit(() => habits.save(), () => {});
+    const ok = await commit(() => habits.save(), () => {}, done ? null : haptic);
     if (!ok) refresh();
     else cheer(h);
   },
@@ -513,10 +514,12 @@ Object.assign(actions, {
   'toggle-habit-day': async ({ id, day }, el) => {
     const h = habits.find(id);
     toggleDay(h, Number(day));
+    const done = isDone(h, Number(day));
+    if (done) successHaptic();
     el.classList.add('just');
-    el.classList.toggle('done', isDone(h, Number(day)));
+    el.classList.toggle('done', done);
     updateStats(el.closest('.screen-inner'), h);
-    const ok = await commit(() => habits.save(), () => {});
+    const ok = await commit(() => habits.save(), () => {}, done ? null : haptic);
     if (!ok) refresh();
     else if (Number(day) === dayNum()) cheer(h);
   },

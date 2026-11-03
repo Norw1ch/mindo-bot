@@ -392,11 +392,12 @@ async function completeRecurring(idea, seg) {
     idea.cnt = (idea.cnt || 0) + 1;
     (idea.items || []).forEach((i) => { i.d = false; });
     return saveIdea(idea);
-  }, () => {});
+  }, () => {}, null);
   if (!ok) {
     refresh();
     return;
   }
+  successHaptic();
   toast(t('Готово! Следующий раз — {0}', dayLabel(next).toLowerCase()));
   await wait(650);
   const route = currentRoute();
@@ -660,7 +661,7 @@ Object.assign(actions, {
       idea.st = key;
       idea.dt = key === 'done' ? Date.now() : null;
       return saveIdea(idea);
-    }, () => {});
+    }, () => {}, key === 'done' ? null : haptic);
     if (!ok) {
       refresh();
       return;

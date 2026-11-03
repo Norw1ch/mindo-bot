@@ -61,12 +61,14 @@ function takeFlash(id) {
 }
 
 // Выполняет изменение и сохранение. При ошибке перечитывает данные, чтобы экран не врал.
-// after — что сделать потом: по умолчанию обновить текущий экран. Возвращает true, если сохранилось
-async function commit(change, after = refresh) {
+// after — что сделать потом: по умолчанию обновить текущий экран.
+// feel — вибрация после сохранения; null — без неё (вызывающий уже вибрировал по-своему).
+// Возвращает true, если сохранилось
+async function commit(change, after = refresh, feel = haptic) {
   let ok = true;
   try {
     await change();
-    haptic();
+    if (feel) feel();
   } catch (err) {
     console.error(err);
     ok = false;
@@ -97,6 +99,37 @@ const SLIDE_MS = 500;
 const SLIDE_EASE = 'cubic-bezier(.32, .72, 0, 1)';
 const UNDER_SHIFT = 'translateX(-28%)'; // насколько нижний экран уходит влево
 
+// Переходы между экранами: 'classic' — новый экран выезжает справа целиком, нижний уходит влево;
+// 'new' — экран коротко проявляется с небольшим сдвигом, прежний чуть уходит в сторону и гаснет.
+// Выбор хранится в облаке, а копия — в браузере, чтобы при запуске сразу были нужные
+const ANIM_KEY = 'anim';
+const NEW_MS = 340;
+const NEW_EASE = 'cubic-bezier(.2, .8, .2, 1)';
+let animStyle = savedAnim();
+
+function savedAnim() {
+  try {
+    return localStorage.getItem(LS_PREFIX + ANIM_KEY) === 'classic' ? 'classic' : 'new';
+  } catch {
+    return 'new';
+  }
+}
+
+function setAnim(style) {
+  animStyle = style;
+  try {
+    localStorage.setItem(LS_PREFIX + ANIM_KEY, style);
+  } catch { /* не страшно: выбор всё равно придёт из облака */ }
+  document.body.classList.toggle('anim-new', style === 'new');
+}
+
+modules.anim = {
+  load(raw) {
+    if (['classic', 'new'].includes(raw[ANIM_KEY]) && raw[ANIM_KEY] !== animStyle) setAnim(raw[ANIM_KEY]);
+  },
+};
+document.body.classList.toggle('anim-new', animStyle === 'new');
+
 function currentRoute() {
   return stack[stack.length - 1];
 }
@@ -125,7 +158,9 @@ function updateFab() {
 
 actions.fab = () => {
   const add = fabs[currentRoute().name];
-  if (add) add(currentRoute());
+  if (!add) return;
+  haptic();
+  add(currentRoute());
 };
 
 // Язык сменился: подписи меню и текущий экран рисуем заново, а другие вкладки соберутся при открытии
@@ -143,7 +178,7 @@ function buildTabbar() {
   tabbar.addEventListener('click', (e) => {
     const btn = e.target.closest('.tab');
     if (!btn) return;
-    softHaptic();
+    haptic();
     switchTab(btn.dataset.tab);
   });
 }
@@ -180,7 +215,7 @@ function switchTab(key) {
     refresh(); // данные могли измениться на другой вкладке
   }
   app.classList.add('active');
-  restartAnim(app, 'tab-in');
+  restartAnim(app, animStyle === 'new' ? 'tab-in-new' : 'tab-in');
   markTab(key);
   updateBackButton();
 }
@@ -189,6 +224,12 @@ function switchTab(key) {
 function motion(el, frames) {
   if (reduceMotion || !el.animate) return null;
   return el.animate(frames, { duration: SLIDE_MS, easing: SLIDE_EASE, fill: 'forwards' });
+}
+
+// «Новые» переходы: своя длительность, задержка и кривая у каждого свойства
+function softMotion(el, frames, { duration = NEW_MS, delay = 0, easing = NEW_EASE } = {}) {
+  if (reduceMotion || !el.animate) return null;
+  return el.animate(frames, { duration, delay, easing, fill: 'both' });
 }
 
 async function finishAll(anims) {
@@ -211,19 +252,27 @@ async function go(route) {
   stack.push(route);
   const under = screens[screens.length - 1];
   const top = makeScreen(stack.length - 1);
-  const shade = makeShade();
+  const classic = animStyle === 'classic';
+  const shade = classic ? makeShade() : null; // затемнение нужно только экрану, который выезжает целиком
   screens.push(top);
-  app.append(shade, top);
+  if (shade) app.append(shade);
+  app.append(top);
   sizeEdits(top);
   updateBackButton();
 
-  const anims = await finishAll([
+  const anims = await finishAll(classic ? [
     motion(top, [{ transform: 'translateX(100%)' }, { transform: 'translateX(0)' }]),
     motion(under, [{ transform: 'translateX(0)' }, { transform: UNDER_SHIFT }]),
     motion(shade, [{ opacity: 0 }, { opacity: 1 }]),
+  ] : [
+    // Прежний экран сначала гаснет, новый проявляется чуть позже — почти без наложения
+    softMotion(under, [{ transform: 'none' }, { transform: 'translateX(-24px)' }]),
+    softMotion(under, [{ opacity: 1 }, { opacity: 0 }], { duration: 180, easing: 'ease-in' }),
+    softMotion(top, [{ transform: 'translateX(36px)' }, { transform: 'none' }]),
+    softMotion(top, [{ opacity: 0 }, { opacity: 1 }], { duration: 260, delay: 60, easing: 'ease-out' }),
   ]);
   under.classList.add('covered'); // нижний слой не виден — прячем (прокрутка сохраняется)
-  shade.remove();
+  if (shade) shade.remove();
   anims.forEach((a) => a.cancel());
   busy = false;
 }
@@ -249,17 +298,23 @@ async function back() {
   const under = screens[screens.length - 1];
   refreshScreen(under, stack.length - 1); // данные могли измениться, пока он был закрыт
   under.classList.remove('covered');
-  const shade = makeShade();
-  top.before(shade);
+  const classic = animStyle === 'classic';
+  const shade = classic ? makeShade() : null;
+  if (shade) top.before(shade);
   updateBackButton();
 
-  const anims = await finishAll([
+  const anims = await finishAll(classic ? [
     motion(top, [{ transform: 'translateX(0)' }, { transform: 'translateX(100%)' }]),
     motion(under, [{ transform: UNDER_SHIFT }, { transform: 'translateX(0)' }]),
     motion(shade, [{ opacity: 1 }, { opacity: 0 }]),
+  ] : [
+    softMotion(top, [{ transform: 'none' }, { transform: 'translateX(36px)' }]),
+    softMotion(top, [{ opacity: 1 }, { opacity: 0 }], { duration: 180, easing: 'ease-in' }),
+    softMotion(under, [{ transform: 'translateX(-24px)' }, { transform: 'none' }]),
+    softMotion(under, [{ opacity: 0 }, { opacity: 1 }], { duration: 260, delay: 60, easing: 'ease-out' }),
   ]);
   top.remove();
-  shade.remove();
+  if (shade) shade.remove();
   anims.forEach((a) => a.cancel());
   busy = false;
 }
@@ -339,6 +394,7 @@ function startEdgeDrag() {
   closeSwipe(false);
   edge.active = true;
   edge.top = screens[screens.length - 1];
+  edge.top.classList.add('edge-drag');
   edge.under = screens[screens.length - 2];
   edge.width = app.clientWidth || window.innerWidth;
   refreshScreen(edge.under, stack.length - 2); // данные могли измениться, пока он был закрыт
@@ -372,6 +428,7 @@ async function finishEdgeDrag() {
   ];
   await Promise.all(anims.map((a) => a.finished));
   g.top.style.transform = '';
+  g.top.classList.remove('edge-drag');
   g.under.style.transform = '';
   g.shade.remove();
   if (complete) {
@@ -427,7 +484,7 @@ function updateBackButton() {
 
 // Перезапускает анимацию появления блока (класс cls)
 function restartAnim(el, cls) {
-  el.classList.remove('list-swap', 'tab-in');
+  el.classList.remove('list-swap', 'tab-in', 'tab-in-new');
   void el.offsetWidth; // без этого анимация с тем же классом не повторится
   el.classList.add(cls);
 }

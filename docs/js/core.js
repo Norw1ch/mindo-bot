@@ -331,19 +331,27 @@ function toast(text) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
 }
 
-// Лёгкая вибрация (только в Telegram)
+// Вибрация через Telegram. Где её нет (браузер, старый Telegram, компьютер) — тихо ничего не делаем
+function buzz(play) {
+  if (!inTelegram || !tg.isVersionAtLeast('6.1')) return;
+  try {
+    play(tg.HapticFeedback);
+  } catch { /* устройство не умеет — не страшно */ }
+}
+
+// Лёгкая вибрация: вкладки, «+», сохранение
 function haptic() {
-  if (inTelegram && tg.isVersionAtLeast('6.1')) tg.HapticFeedback.impactOccurred('light');
+  buzz((h) => h.impactOccurred('light'));
 }
 
-// Вибрация «получилось» — например, план выполнен
+// Вибрация «получилось»: задача выполнена, привычка отмечена
 function successHaptic() {
-  if (inTelegram && tg.isVersionAtLeast('6.1')) tg.HapticFeedback.notificationOccurred('success');
+  buzz((h) => h.notificationOccurred('success'));
 }
 
-// Самая мягкая вибрация — переключения, открытие кнопки свайпа
+// Самая мягкая вибрация — переключатели, открытие кнопки свайпа
 function softHaptic() {
-  if (inTelegram && tg.isVersionAtLeast('6.1')) tg.HapticFeedback.selectionChanged();
+  buzz((h) => h.selectionChanged());
 }
 
 function confirmDialog(text) {
