@@ -95,10 +95,9 @@ views.notes = (route) => {
     : '';
 
   return `
-    <h1>${t('Заметки')}</h1>
-    <p class="sub">${total ? plural(total, ['заметка', 'заметки', 'заметок']) : t('Заметок пока нет')}</p>
+    ${headHtml(total ? plural(total, ['заметка', 'заметки', 'заметок']) : t('Заметок пока нет'), t('Заметки'))}
     <div class="actions">
-      <button class="btn primary" data-act="new-note">➕ ${t('Новая заметка')}</button>
+      <button class="btn primary" data-act="new-note">${btnLabel('plus', t('Новая заметка'))}</button>
     </div>
     ${total ? searchHtml(route.q, t('Поиск по заметкам')) : ''}
     <div class="search-results paged${searching ? '' : ' hidden'}">${searching ? notesSearchHtml(route) : ''}</div>

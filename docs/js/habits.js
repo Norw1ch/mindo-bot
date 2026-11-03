@@ -405,10 +405,9 @@ document.addEventListener('touchcancel', endCalDrag);
 views.habits = () => {
   const rows = [...habits.items].sort((a, b) => a.at - b.at).map(habitRowHtml).join('');
   return `
-    <h1>${t('Привычки')}</h1>
-    <p class="sub habits-sub">${habitsSummary()}</p>
+    ${headHtml(habitsSummary(), t('Привычки'), { lineCls: 'habits-sub' })}
     <div class="actions">
-      <button class="btn primary" data-act="new-habit">➕ ${t('Новая привычка')}</button>
+      <button class="btn primary" data-act="new-habit">${btnLabel('plus', t('Новая привычка'))}</button>
     </div>
     ${rows ? `<div class="group">${rows}</div>` : ''}`;
 };

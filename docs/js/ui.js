@@ -15,6 +15,34 @@ const CHEVRON = '<svg class="chev" width="8" height="13" viewBox="0 0 8 13" aria
 // Кружок для отметки (чеклист в плане, пункты списков); галочка «рисуется» при отметке
 const CHECK = '<span class="check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.5 12.5 3.5 3.5 7.5-8"/></svg></span>';
 
+// Монохромная иконка 24×24 из контуров
+function icon(paths) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+}
+
+// Контуры значков на кнопках
+const ICONS = {
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  archive: '<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V9M10 13h4"/>',
+  restore: '<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4v4.5H9"/>',
+  settings: '<path d="M4 7h9M18 7h2M4 17h2M11 17h9"/><circle cx="15.5" cy="7" r="2.5"/><circle cx="8.5" cy="17" r="2.5"/>',
+};
+
+// Подпись кнопки со значком слева
+function btnLabel(name, text) {
+  return `${icon(ICONS[name])}<span>${text}</span>`;
+}
+
+// Шапка экрана: мелкая серая строка, под ней крупный заголовок.
+// lineCls — класс строки (чтобы обновлять её на месте), side — кнопка справа от заголовка
+function headHtml(line, title, { lineCls = '', titleCls = '', side = '' } = {}) {
+  const h1 = `<h1${titleCls ? ` class="${titleCls}"` : ''}>${title}</h1>`;
+  return `
+    <p class="head-line${lineCls ? ' ' + lineCls : ''}">${line}</p>
+    ${side ? `<div class="head-row">${h1}${side}</div>` : h1}`;
+}
+
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // Что мягко подсветить при следующей отрисовке (новая строка, новое имя).
@@ -485,13 +513,17 @@ function collapse(el) {
 
 // ---------- Переключатель (сегменты) ----------
 
-// Переключатель в стиле iOS: «таблетка» под выбранным сегментом.
+// Переключатель в стиле iOS: светлая «таблетка» над выбранным сегментом.
+// На таблетке свои тёмные подписи, они едут вместе с ней в обратную сторону и стоят на месте
+// подписей кнопок: цвет текста меняется ровно по краю таблетки, даже пока она в пути.
 // extra — дополнительные атрибуты для кнопок (например, data-id)
 function segHtml(items, activeKey, act, extra = '', cls = '') {
   const k = items.findIndex((i) => i.key === activeKey);
   const buttons = items.map((i) => `
     <button class="seg-btn${i.key === activeKey ? ' active' : ''}" data-act="${act}" data-key="${i.key}"${extra}>${i.html}</button>`).join('');
-  return `<div class="seg ${cls}" style="--n:${items.length};--k:${k}"><span class="seg-pill"></span>${buttons}</div>`;
+  const labels = items.map((i) => `<span class="seg-label">${i.html}</span>`).join('');
+  return `<div class="seg ${cls}" style="--n:${items.length};--k:${k}">${buttons}`
+    + `<span class="seg-pill"><span class="seg-labels" aria-hidden="true">${labels}</span></span></div>`;
 }
 
 // Плавно переносит «таблетку» на другой сегмент, не перерисовывая экран
@@ -507,10 +539,18 @@ function afterSegMove(work) {
   requestAnimationFrame(() => requestAnimationFrame(work));
 }
 
-// Таблетку можно тянуть пальцем: она едет за ним, подпись под ней загорается сразу.
+// Таблетку можно тянуть пальцем: она едет за ним вместе со своими подписями.
 // Отпустил — таблетка доезжает до ближайшего сегмента, и он выбирается, как при нажатии
 const SEG_SNAP = 'transform .3s cubic-bezier(.2, .8, .2, 1)'; // доводка: с ходу, без разгона
 let segDrag = null;
+
+// x — сдвиг таблетки в пикселях (подписи на ней едут обратно); null — вернуть обоих под управление CSS
+function setPill(d, x, transition) {
+  [d.pill, d.labels].forEach((el, i) => {
+    el.style.transition = transition;
+    el.style.transform = x === null ? '' : `translateX(${i ? -x : x}px)`;
+  });
+}
 
 document.addEventListener('pointerdown', (e) => {
   const btn = e.target.closest('.seg-btn.active');
@@ -523,7 +563,7 @@ document.addEventListener('pointerdown', (e) => {
   // Таблетка может ещё ехать после нажатия — тянем её с того места, где она сейчас
   const shift = getComputedStyle(pill).transform;
   segDrag = {
-    seg, pill, buttons, id: e.pointerId, x0: e.clientX, y0: e.clientY, k0: k, k,
+    seg, pill, labels: pill.querySelector('.seg-labels'), buttons, id: e.pointerId, x0: e.clientX, y0: e.clientY, k0: k, k,
     from: shift === 'none' ? 0 : new DOMMatrixReadOnly(shift).m41,
     w: pill.getBoundingClientRect().width, active: false,
   };
@@ -542,11 +582,10 @@ document.addEventListener('pointermove', (e) => {
     }
     d.active = true;
     clearTimeout(d.pill.snapTimer);
-    d.pill.style.transition = 'none';
     try { d.seg.setPointerCapture(e.pointerId); } catch { /* не страшно */ }
   }
   const x = Math.min(Math.max(d.from + dx, 0), (d.buttons.length - 1) * d.w);
-  d.pill.style.transform = `translateX(${x}px)`;
+  setPill(d, x, 'none');
   const k = Math.round(x / d.w);
   if (k !== d.k) {
     d.k = k;
@@ -563,9 +602,11 @@ function endSegDrag(e) {
   suppressClick = true;
   // Жест сорвался или приложение занято — таблетка возвращается на прежнее место
   const btn = d.buttons[e.type === 'pointerup' && !busy ? d.k : d.k0];
-  d.pill.style.transition = SEG_SNAP;
-  d.pill.style.transform = '';
-  d.pill.snapTimer = setTimeout(() => { d.pill.style.transition = ''; }, 320);
+  setPill(d, null, SEG_SNAP);
+  d.pill.snapTimer = setTimeout(() => {
+    d.pill.style.transition = '';
+    d.labels.style.transition = '';
+  }, 320);
   if (btn === d.buttons[d.k0] || !d.seg.isConnected) {
     moveSeg(d.seg, d.buttons[d.k0].dataset.key);
     return;

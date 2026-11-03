@@ -2,12 +2,6 @@
 
 // Вкладки внизу экрана и запуск приложения
 
-// Монохромная иконка 24×24 из контуров
-function icon(paths) {
-  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
-}
-
 // root — главный экран вкладки
 const TABS = [
   {

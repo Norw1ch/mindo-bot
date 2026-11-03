@@ -63,8 +63,7 @@ async function restoreBackup(text) {
 views.backup = () => {
   const used = Object.keys(lastRaw).length;
   return `
-    <h1>${t('Резервная копия')}</h1>
-    <p class="sub">${t('Задачи, заметки, списки, привычки и расходы')}</p>
+    ${headHtml(t('Задачи, заметки, списки, привычки и расходы'), t('Резервная копия'))}
     <div class="card">
       <p class="idea-text muted">${t('Всё хранится в облаке Telegram. На всякий случай сохрани копию: нажми «Скопировать копию» и вставь текст в «Избранное» Telegram.')}</p>
     </div>

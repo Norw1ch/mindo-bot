@@ -124,6 +124,18 @@ body.no-tabbar .tabbar {
 h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01em; word-break: break-word; }
 .swap { animation: in-fade .3s ease backwards; }
 .sub { margin-top: 4px; color: var(--muted); font-size: 15px; }
+/* Шапка экрана: мелкая серая строка над крупным заголовком */
+.head-line { margin-bottom: 2px; color: var(--gray); font-size: 14px; line-height: 19px; }
+.head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.head-row h1 { min-width: 0; }
+/* Круглая кнопка у заголовка — настройки на главной */
+.round-btn {
+  flex: none; display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border-radius: 50%; background: var(--cell);
+  transition: transform .25s var(--soft);
+}
+.round-btn:active { transform: scale(0.9); transition-duration: .1s; }
+.round-btn svg { width: 22px; height: 22px; }
 .back { margin-bottom: 12px; color: var(--muted); font-size: 16px; }
 .empty { padding: 32px 0; color: var(--muted); text-align: center; }
 
@@ -141,7 +153,8 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .row .meta { color: var(--muted); }
 .row .chev { flex: none; color: var(--faint); }
 .row.danger { color: var(--red); }
-.row .st { flex: none; width: 22px; text-align: center; font-size: 15px; }
+.row .st { flex: none; display: flex; justify-content: center; width: 22px; }
+.row .st svg { width: 18px; height: 18px; }
 .row .meta.small { font-size: 15px; white-space: nowrap; }
 .meta.late { color: var(--red); }
 .muted { color: var(--muted); }
@@ -162,39 +175,60 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .group-head + .group { margin-top: 0; }
+/* Заголовок группы со ссылкой справа: «По категориям … Все 8» */
+.group-head.with-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; overflow: visible; }
+.head-link {
+  display: flex; align-items: center; min-height: 44px; margin: -14px -12px -14px 0; padding: 0 12px; /* место для пальца — 44px, а строка остаётся низкой */
+  color: var(--gray); font-size: 13px; text-transform: none; letter-spacing: 0;
+}
+.head-link:active { opacity: 0.5; }
+.group-head.with-link span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Пояснение под блоком, как в настройках iOS */
+.foot-note { margin: 8px 18px 0; color: var(--muted); font-size: 13px; }
 
 .hidden { display: none !important; }
 
 .empty.small { padding: 26px 0 8px; font-size: 15px; }
 
 /* ---------- Переключатель (фильтры и статусы) ---------- */
+/* Выбранное — светлая капсула с тёмной подписью, остальное — тёмное со светлой */
 .seg {
   position: relative; display: grid; grid-template-columns: repeat(var(--n), 1fr);
-  margin-top: 18px; padding: 3px; border-radius: var(--r-field); background: var(--field);
+  margin-top: 18px; padding: 3px; border-radius: 25px; background: var(--cell);
   /* Вбок таблетку тянет палец, вверх-вниз — прокрутка страницы */
   touch-action: pan-y; user-select: none; -webkit-user-select: none;
 }
+/* Таблетка лежит над кнопками, но нажатия пропускает к ним */
 .seg-pill {
-  position: absolute; top: 3px; bottom: 3px; left: 3px;
-  width: calc((100% - 6px) / var(--n)); border-radius: 19px;
-  background: var(--cell); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.12);
+  position: absolute; z-index: 1; top: 3px; bottom: 3px; left: 3px;
+  width: calc((100% - 6px) / var(--n)); border-radius: 22px; overflow: hidden;
+  background: var(--inv-bg); pointer-events: none;
   transform: translateX(calc(var(--k) * 100%));
   /* Разгон с нуля и мягкая остановка. Без will-change: на iPhone постоянный слой таблетки
      закрывает подпись на ней, пока экран выезжает */
   transition: transform .4s cubic-bezier(.45, 0, .15, 1);
 }
-[data-theme="dark"] .seg-pill { background: #636366; }
-.seg-btn {
-  position: relative; z-index: 1; min-width: 0; padding: 8px 2px; border-radius: 19px;
-  color: var(--muted); font-size: 13px; font-weight: 600; white-space: nowrap; /* толщина одна: её смена — мгновенный рывок */
-  transition: color .3s ease;
+/* Подписи на таблетке — во всю ширину переключателя. Едут в обратную сторону, поэтому
+   стоят точно над подписями кнопок, а таблетка как бы открывает их по своему краю */
+.seg-labels {
+  position: absolute; top: 0; bottom: 0; left: 0; width: calc(var(--n) * 100%);
+  display: grid; grid-template-columns: repeat(var(--n), 1fr);
+  color: var(--inv-fg);
+  transform: translateX(calc(var(--k) * -100% / var(--n)));
+  transition: transform .4s cubic-bezier(.45, 0, .15, 1);
 }
-.seg-btn.active { color: var(--fg); }
+.seg-btn, .seg-label {
+  display: flex; align-items: center; justify-content: center;
+  min-width: 0; min-height: 44px; padding: 8px 2px; border-radius: 22px;
+  font-size: 13px; font-weight: 600; white-space: nowrap;
+}
+.seg-btn { color: var(--fg); }
+.seg .ic { display: flex; }
+.seg .ic svg { width: 20px; height: 20px; }
 /* Большой вариант — статусы в карточке: значок над подписью */
-.seg.big .seg-btn { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 2px; }
-.seg.big .ic { font-size: 18px; line-height: 1.2; }
+.seg.big .seg-btn, .seg.big .seg-label { flex-direction: column; gap: 4px; padding: 10px 2px; }
 .seg.big { border-radius: var(--r-block); }
-.seg.big .seg-pill, .seg.big .seg-btn { border-radius: 25px; }
+.seg.big .seg-pill, .seg.big .seg-btn, .seg.big .seg-label { border-radius: 25px; }
 
 /* ---------- Страницы ---------- */
 .pager { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 14px; }
@@ -349,7 +383,6 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .cal-day.just.done { animation: check-pop .4s var(--soft); }
 
 /* ---------- Главная ---------- */
-.home-date { margin-bottom: 2px; color: var(--gray); font-size: 13px; }
 .home-label { color: var(--gray); font-size: 13px; text-transform: uppercase; letter-spacing: 0.02em; }
 
 /* Поиск по всему — пилюля */
@@ -440,10 +473,8 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 .chip-plus:active { transform: scale(0.9); transition-duration: .1s; }
 .chip-plus svg { width: 20px; height: 20px; }
 
-/* Переключатель «Расходы / Баланс» вместо заголовка */
-.seg.fin-seg { margin-top: 0; border-radius: 26px; }
-.fin-seg .seg-pill, .fin-seg .seg-btn { border-radius: 23px; }
-.fin-seg .seg-btn { padding: 11px 2px; font-size: 16px; }
+/* Переключатель «Баланс / Расходы» под заголовком — крупнее остальных */
+.fin-seg .seg-btn, .fin-seg .seg-label { padding: 11px 2px; font-size: 16px; }
 
 /* Две даты своего периода */
 .range-card {
@@ -552,10 +583,12 @@ h1 { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01
 /* ---------- Кнопки ---------- */
 .actions { display: grid; gap: 10px; margin-top: 22px; }
 .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   height: 52px; padding: 0 16px; border-radius: 26px;
   background: var(--cell); font-weight: 600;
   transition: transform .25s var(--soft), opacity .25s ease;
 }
+:where(.btn) svg { flex: none; width: 20px; height: 20px; } /* у быстрых кнопок свой размер */
 .btn:active { transform: scale(0.97); opacity: 0.8; transition-duration: .1s; }
 .btn.primary { background: var(--inv-bg); color: var(--inv-fg); }
 .btn.quiet { color: var(--muted); font-weight: 500; }

@@ -100,10 +100,9 @@ views.lists = () => {
   const all = [...lists.items].sort((a, b) => b.up - a.up); // недавно изменённые сверху
   const rows = all.map(listRowHtml).join('');
   return `
-    <h1>${t('Списки')}</h1>
-    <p class="sub">${all.length ? plural(all.length, ['список', 'списка', 'списков']) : t('Списков пока нет')}</p>
+    ${headHtml(all.length ? plural(all.length, ['список', 'списка', 'списков']) : t('Списков пока нет'), t('Списки'))}
     <div class="actions">
-      <button class="btn primary" data-act="new-list">➕ ${t('Новый список')}</button>
+      <button class="btn primary" data-act="new-list">${btnLabel('plus', t('Новый список'))}</button>
     </div>
     ${rows ? `<div class="group">${rows}</div>` : ''}`;
 };

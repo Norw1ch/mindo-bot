@@ -265,11 +265,17 @@ function catsBreakdownHtml(route) {
     const id = findCat(e.c).id;
     byCat.set(id, (byCat.get(id) || 0) + e.a);
   });
-  if (!byCat.size) return '';
   const rows = [...byCat.entries()].sort((a, b) => b[1] - a[1]);
-  const max = rows[0][1];
+  const max = rows.length ? rows[0][1] : 0;
+  // Заголовок со ссылкой на все категории есть всегда: иначе в пустом периоде до них не добраться
+  const head = `
+    <div class="group-head with-link">
+      <span>${t('По категориям')}</span>
+      <button class="head-link" data-act="open-mcats">${t('Все {0}', mcats.length)}</button>
+    </div>`;
+  if (!rows.length) return head;
   return `
-    <p class="group-head">${t('По категориям')}</p>
+    ${head}
     <div class="group">${rows.map(([id, total]) => {
       const cat = findCat(id);
       return `
@@ -329,7 +335,6 @@ function periodHtml(route) {
   return `
     <div class="page-items">
       ${catsBreakdownHtml(route)}
-      ${list.length ? `<p class="group-head">${t('Расходы')}</p>` : ''}
       <div class="paged">${list.length ? expenseListHtml(route) : ''}</div>
     </div>`;
 }
@@ -339,7 +344,7 @@ function periodBlockHtml(route) {
   return `
     ${totalHtml(route)}
     <div class="actions total-action">
-      <button class="btn primary" data-act="add-expense">➕ ${t('Добавить расход')}</button>
+      <button class="btn primary" data-act="add-expense">${btnLabel('plus', t('Добавить расход'))}</button>
     </div>
     ${periodHtml(route)}`;
 }
@@ -400,6 +405,7 @@ function finView(route) {
 }
 
 views.money = (route) => `
+  ${headHtml(t('Баланс {0}', formatMoney(totalBalance())), t('Финансы'))}
   ${segHtml(FIN_VIEWS.map((v) => ({ ...v, html: t(v.html) })), finView(route), 'set-fin-view', '', 'fin-seg')}
   <div class="fin-body paged">${finBodyHtml(route)}</div>`;
 
@@ -412,9 +418,6 @@ const expensesPageHtml = (route) => `
   <div class="range-card${periodOf(route).key === 'custom' ? '' : ' hidden'}">${rangeHtml(route)}</div>
   <div class="after-range">
     <div class="period-box paged">${periodBlockHtml(route)}</div>
-    <div class="group">
-      <button class="row" data-act="open-mcats"><span class="title">${t('Категории')}</span><span class="meta">${mcats.length}</span>${CHEVRON}</button>
-    </div>
   </div>`;
 
 // Расходы одной категории за выбранный период
@@ -422,8 +425,7 @@ views.mcat = (route) => {
   const cat = findCat(route.catId);
   const list = periodExpenses(route, cat.id);
   return `
-    <h1>${esc(cat.name)}</h1>
-    <p class="sub">${periodName(route)} · ${formatMoney(sum(list))}</p>
+    ${headHtml(`${periodName(route)} · ${formatMoney(sum(list))}`, esc(cat.name))}
     <div class="paged">${expenseListHtml(route)}</div>`;
 };
 
@@ -476,12 +478,12 @@ views.mcats = () => {
       </div>`;
   }).join('');
   return `
-    <h1>${t('Категории')}</h1>
-    <p class="sub">${t('Нажми, чтобы переименовать; свайп влево — удалить')}</p>
+    ${headHtml(plural(mcats.length, ['категория', 'категории', 'категорий']), t('Категории'))}
     <div class="actions">
-      <button class="btn primary" data-act="new-mcat">➕ ${t('Новая категория')}</button>
+      <button class="btn primary" data-act="new-mcat">${btnLabel('plus', t('Новая категория'))}</button>
     </div>
-    <div class="group">${rows}</div>`;
+    <div class="group">${rows}</div>
+    <p class="foot-note">${t('Нажми, чтобы переименовать; свайп влево — удалить')}</p>`;
 };
 
 editors['exp-amount'] = {

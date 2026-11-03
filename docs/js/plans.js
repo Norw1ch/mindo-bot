@@ -157,11 +157,16 @@ deleters.item = {
 
 // ---------- Отображение ----------
 
+// Значок статуса — кружок: пустой, закрашенный наполовину или целиком
+function statusIcon(fill) {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/>${fill}</svg>`;
+}
+
 // Статусы: значок и название
 const STATUS = {
-  new: { icon: '⚪', label: 'Not started' },
-  wip: { icon: '◐', label: 'In progress' },
-  done: { icon: '⚫', label: 'Done' },
+  new: { icon: statusIcon(''), label: 'Not started' },
+  wip: { icon: statusIcon('<path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>'), label: 'In progress' },
+  done: { icon: statusIcon('<circle cx="12" cy="12" r="8" fill="currentColor"/>'), label: 'Done' },
 };
 
 // Сегменты переключателя статуса в карточке
@@ -248,7 +253,7 @@ function dueMeta(idea) {
 // «Выполненные»: все Done по порядку разделов, на странице группируются по разделам
 function archiveListHtml(route) {
   const list = data.sections.flatMap((s) => filteredIdeas(s.id, 'done'));
-  if (!list.length) return `<p class="empty">${t('Здесь появятся задачи со статусом ⚫ Done')}</p>`;
+  if (!list.length) return `<p class="empty">${t('Здесь появятся задачи со статусом Done')}</p>`;
   return groupedPage(list, route, (idea) => {
     const s = findSection(idea.sec);
     return { key: s.id, label: `${esc(s.name)} · ${filteredIdeas(s.id, 'done').length}` };
@@ -425,16 +430,15 @@ views.main = (route) => {
   const searching = Boolean((route.q || '').trim());
 
   return `
-    <h1>${t('Мои задачи')}</h1>
-    <p class="sub">${t(data.sections.length ? 'Выбери раздел' : 'Разделов пока нет')}</p>
+    ${headHtml(t('{0} в работе', wipCount()), t('Задачи'))}
     ${data.ideas.length ? searchHtml(route.q, t('Поиск по задачам')) : ''}
     <div class="search-results paged${searching ? '' : ' hidden'}">${searching ? searchListHtml(route) : ''}</div>
     <div class="search-body${searching ? ' hidden' : ''}">
       ${today}
       ${sections}
       <div class="actions">
-        <button class="btn primary" data-act="new-section">➕ ${t('Новый раздел')}</button>
-        <button class="btn" data-act="open-archive">🗄 ${t('Выполненные')}</button>
+        <button class="btn primary" data-act="new-section">${btnLabel('plus', t('Новый раздел'))}</button>
+        <button class="btn" data-act="open-archive">${btnLabel('archive', t('Выполненные'))}</button>
       </div>
     </div>`;
 };
@@ -447,10 +451,10 @@ views.section = (route) => {
   const active = filteredIdeas(s.id, 'all').length;
 
   return `
-    <h1${takeFlash(s.id) ? ' class="swap"' : ''}>${esc(s.name)}</h1>
-    <p class="sub">${active ? t('{0} в работе', plural(active, ['задача', 'задачи', 'задач'])) : t('Активных задач нет')}</p>
+    ${headHtml(active ? t('{0} в работе', plural(active, ['задача', 'задачи', 'задач'])) : t('Активных задач нет'), esc(s.name),
+      { titleCls: takeFlash(s.id) ? 'swap' : '' })}
     <div class="actions">
-      <button class="btn primary" data-act="add-idea" data-id="${s.id}">➕ ${t('Новая задача')}</button>
+      <button class="btn primary" data-act="add-idea" data-id="${s.id}">${btnLabel('plus', t('Новая задача'))}</button>
     </div>
     ${segHtml(FILTERS.map((f) => ({ ...f, html: t(f.html) })), filter, 'set-filter')}
     <div class="paged">${ideaListHtml(route)}</div>
@@ -477,7 +481,7 @@ views.idea = (route) => {
       <p class="date">${dateLine(idea)}</p>
     </div>
     <div class="actions restore${idea.st === 'done' ? '' : ' hidden'}">
-      <button class="btn primary" data-act="restore-idea" data-id="${idea.id}">↺ ${t('Вернуть в работу')}</button>
+      <button class="btn primary" data-act="restore-idea" data-id="${idea.id}">${btnLabel('restore', t('Вернуть в работу'))}</button>
     </div>
     ${checklistHtml(idea)}
     <div class="group">
@@ -520,8 +524,7 @@ editors['idea-text'] = {
 views.archive = (route) => {
   const total = data.ideas.filter((i) => i.st === 'done').length;
   return `
-    <h1>${t('Выполненные')}</h1>
-    <p class="sub">${total ? plural(total, ['задача', 'задачи', 'задач']) : t('Пока ничего не выполнено')}</p>
+    ${headHtml(total ? plural(total, ['задача', 'задачи', 'задач']) : t('Пока ничего не выполнено'), t('Выполненные'))}
     <div class="paged">${archiveListHtml(route)}</div>`;
 };
 
@@ -529,8 +532,7 @@ views.archive = (route) => {
 views.agenda = (route) => {
   const n = datedIdeas().length;
   return `
-    <h1>${t('Сроки')}</h1>
-    <p class="sub">${n ? t('{0} с датой', plural(n, ['задача', 'задачи', 'задач'])) : t('Нет задач со сроком')}</p>
+    ${headHtml(n ? t('{0} с датой', plural(n, ['задача', 'задачи', 'задач'])) : t('Нет задач со сроком'), t('Сроки'))}
     <div class="paged">${agendaListHtml(route)}</div>`;
 };
 
@@ -727,7 +729,7 @@ Object.assign(actions, {
       refresh();
       return;
     }
-    if (it.d && done === total && idea.st !== 'done') toast(t('Все пункты готовы — можно отметить ⚫ Done'));
+    if (it.d && done === total && idea.st !== 'done') toast(t('Все пункты готовы — можно отметить Done'));
   },
 
   // Срок: быстрые варианты, календарь или «Убрать срок»

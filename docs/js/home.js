@@ -29,10 +29,6 @@ function todayCardHtml() {
     </section>`;
 }
 
-function settingsIcon() {
-  return icon('<path d="M4 7h9M18 7h2M4 17h2M11 17h9"/><circle cx="15.5" cy="7" r="2.5"/><circle cx="8.5" cy="17" r="2.5"/>');
-}
-
 function plusIcon() {
   return icon('<path d="M12 5v14M5 12h14"/>');
 }
@@ -65,10 +61,6 @@ function tilesHtml() {
       <button class="tile add" data-act="quick-section">
         ${plusIcon()}
         <span class="tile-text"><b>${t('Новый раздел')}</b></span>
-      </button>
-      <button class="tile wide" data-act="open-settings">
-        ${settingsIcon()}
-        <span class="tile-text"><b>${t('Настройки')}</b><span>${LANGS[lang].name}</span></span>
       </button>
     </div>`;
 }
@@ -108,8 +100,9 @@ views.home = (route) => {
   // Пока в поиске есть текст — вместо обычного содержимого результаты
   const searching = Boolean((route.q || '').trim());
   return `
-    <p class="home-date">${todayLine()}</p>
-    <h1>${t('Главная')}</h1>
+    ${headHtml(todayLine(), t('Главная'), {
+      side: `<button class="round-btn" data-act="open-settings" aria-label="${t('Настройки')}">${icon(ICONS.settings)}</button>`,
+    })}
     <div class="home-search">${searchHtml(route.q, t('Поиск по всему'))}</div>
     <div class="search-results paged${searching ? '' : ' hidden'}">${searching ? homeSearchHtml(route) : ''}</div>
     <div class="search-body${searching ? ' hidden' : ''}">

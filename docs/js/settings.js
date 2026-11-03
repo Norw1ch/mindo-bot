@@ -3,7 +3,7 @@
 // Настройки: язык интерфейса и резервная копия. Открываются с главной
 
 views.settings = () => `
-  <h1>${t('Настройки')}</h1>
+  ${headHtml(t('Язык и резервная копия'), t('Настройки'))}
   <div class="group">
     <button class="row" data-act="pick-lang">
       <span class="title">${t('Язык')}</span>
