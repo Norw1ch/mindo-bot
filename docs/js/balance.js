@@ -7,8 +7,9 @@
 // moves.items: [{id, k, acc, to, a, t, n}] — операции, пачками в ключах mov_0, mov_1, …
 //   k — вид: start (начальная сумма), in (пополнение), out (снятие), move (перевод acc → to),
 //   fix (поправка до точной суммы, a со знаком); a — копейки, t — когда, n — комментарий
-// Сумма нигде не хранится: баланс — это его операции минус расходы, списанные с него (e.b).
-// Поэтому изменённый или удалённый расход сразу отражается на балансе
+// Сумма нигде не хранится: баланс — это его операции минус расходы, списанные с него (e.b),
+// и плюс-минус возвраты долгов через него (p.b, debts.js). Поэтому изменённый или удалённый
+// расход или возврат сразу отражается на балансе
 
 const accounts = makeBucket('acc_');
 const moves = makeBucket('mov_');
@@ -39,18 +40,20 @@ function moveDelta(m, id) {
 
 function balanceOf(id) {
   const moved = moves.items.reduce((total, m) => total + moveDelta(m, id), 0);
-  return moved - sum(expenses.items.filter((e) => e.b === id));
+  const repaid = debtPays(id).reduce((total, { debt, pay }) => total + payDelta(debt, pay), 0);
+  return moved - sum(expenses.items.filter((e) => e.b === id)) + repaid;
 }
 
 function totalBalance() {
   return accounts.items.reduce((total, acc) => total + balanceOf(acc.id), 0);
 }
 
-// Что происходило с балансом (или со всеми): операции и списанные расходы, свежие сверху
+// Что происходило с балансом (или со всеми): операции, списанные расходы и возвраты долгов, свежие сверху
 function historyItems(id) {
   return [
     ...moves.items.filter((m) => !id || m.acc === id || m.to === id),
     ...expenses.items.filter((e) => e.b && (!id || e.b === id)),
+    ...debtPays(id).map(({ debt, pay }) => ({ debt, pay, t: pay.t })),
   ].sort((a, b) => b.t - a.t);
 }
 
@@ -88,9 +91,11 @@ async function deleteAccountData(id) {
     return { id: m.id, k: m.acc === id ? 'in' : 'out', acc: other, a: m.a, t: m.t, n: m.n };
   });
   expenses.items.filter((e) => e.b === id).forEach((e) => { delete e.b; });
+  debtPays(id).forEach(({ pay }) => { delete pay.b; });
   accounts.items = accounts.items.filter((acc) => acc.id !== id);
   await moves.save();
   await expenses.save();
+  await debts.save();
   await accounts.save();
 }
 
@@ -126,12 +131,21 @@ function balanceCardHtml(route) {
     ? (count ? plural(count, ['операция', 'операции', 'операций']) : t('Операций пока нет'))
     : (accounts.items.length ? plural(accounts.items.length, ['баланс', 'баланса', 'балансов']) : t('Нажми ＋, чтобы добавить первый баланс'));
   const dots = icon('<circle cx="6" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="18" cy="12" r="1"/>');
+  // На общем балансе сбоку — сколько будет, если вернуть свои долги и получить чужие
+  const owe = debtsTotal('out');
+  const owed = debtsTotal('in');
+  const net = !acc && accounts.items.length && (owe || owed)
+    ? `<span class="total-net">${t('С учётом долгов')} <b>${formatMoney(totalBalance() - owe + owed)}</b></span>`
+    : '';
   return `
     <div class="total-card">
       ${acc ? `<button class="more-btn" data-act="acc-menu" aria-label="${t('Настройки')}">${dots}</button>` : ''}
       <p class="total-head">${acc ? esc(acc.name) : t('Общий баланс')}</p>
       <b class="total-sum${sumSize(total)}${takeFlash('total') ? ' swap' : ''}">${total}</b>
-      <span class="total-sub">${note}</span>
+      <div class="total-foot">
+        <span class="total-sub">${note}</span>
+        ${net}
+      </div>
     </div>`;
 }
 
@@ -189,7 +203,10 @@ function historyHtml(route) {
   return groupedPage(list, route, (item) => {
     const key = dayKey(new Date(item.t));
     return { key, label: dayLabelLong(key) };
-  }, (item, n) => (item.k ? moveRowHtml(item, route, n) : spentRowHtml(item, route)));
+  }, (item, n) => {
+    if (item.debt) return debtHistoryRowHtml(item, route);
+    return item.k ? moveRowHtml(item, route, n) : spentRowHtml(item, route);
+  });
 }
 
 // Всё, что под лентой балансов: сумма, кнопки и история

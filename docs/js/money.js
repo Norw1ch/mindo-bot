@@ -2,7 +2,7 @@
 'use strict';
 
 // Модуль «Финансы», страница «Расходы»: траты по категориям, итог за период, свои категории.
-// Страница «Баланс» — в balance.js. Валюта — гривна
+// Страница «Баланс» — в balance.js, «Долги» — в debts.js. Валюта — гривна
 
 // ---------- Данные ----------
 // mcats: [{id, name}] — категории, в ключе "mcats" (пока не менялись — берутся стандартные)
@@ -388,13 +388,13 @@ function toggleRange(inner, show) {
   };
 }
 
-pagers.money = (route) => (finView(route) === 'balance' ? historyHtml(route) : expenseListHtml(route));
+pagers.money = (route) => ({ balance: historyHtml, expenses: expenseListHtml, debts: debtListHtml })[finView(route)](route);
 pagers.mcat = expenseListHtml;
 
 // ---------- Экраны ----------
 
-// Две страницы «Финансов» на одной вкладке
-const FIN_VIEWS = [{ key: 'balance', html: 'Баланс' }, { key: 'expenses', html: 'Расходы' }];
+// Три страницы «Финансов» на одной вкладке
+const FIN_VIEWS = [{ key: 'balance', html: 'Баланс' }, { key: 'expenses', html: 'Расходы' }, { key: 'debts', html: 'Долги' }];
 
 // Какая страница открыта; при входе в раздел — «Баланс»
 function finView(route) {
@@ -407,7 +407,10 @@ views.money = (route) => `
   <div class="fin-body paged">${finBodyHtml(route)}</div>`;
 
 function finBodyHtml(route) {
-  return finView(route) === 'balance' ? balancePageHtml(route) : expensesPageHtml(route);
+  const view = finView(route);
+  if (view === 'balance') return balancePageHtml(route);
+  if (view === 'debts') return debtsPageHtml(route);
+  return expensesPageHtml(route);
 }
 
 const expensesPageHtml = (route) => `
@@ -503,9 +506,12 @@ editors['exp-note'] = {
 
 // ---------- Действия ----------
 
-// «+»: на «Расходах» — расход, на «Балансе» — пополнение, а если балансов ещё нет — первый баланс
+// «+»: на «Расходах» — расход, на «Долгах» — долг, на «Балансе» — пополнение,
+// а если балансов ещё нет — первый баланс
 fabs.money = (route) => {
-  if (finView(route) === 'expenses') actions['add-expense']();
+  const view = finView(route);
+  if (view === 'expenses') actions['add-expense']();
+  else if (view === 'debts') actions['new-debt']();
   else actions[accounts.items.length ? 'bal-add' : 'new-account']();
 };
 fabs.mcat = () => actions['add-expense']();
@@ -567,7 +573,7 @@ Object.assign(actions, {
     if (ok) toast(`${formatMoney(expense.a)} · ${findCat(catId).name}`);
   },
 
-  // Переключатель «Расходы / Баланс». Под страницей ничего нет — высоту не анимируем
+  // Переключатель «Баланс / Расходы / Долги». Под страницей ничего нет — высоту не анимируем
   'set-fin-view': ({ key }, el) => {
     const route = currentRoute();
     if (finView(route) === key) return;

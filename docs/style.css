@@ -552,6 +552,13 @@ button.row:active { transform: scale(0.97); }
 .total-sum.long { font-size: 34px; }
 .total-sum.longer { font-size: 27px; }
 .total-sub { display: block; margin-top: 6px; color: var(--muted); font-size: 15px; }
+/* Низ карточки: подпись слева, «с учётом долгов» справа; не влезают в строку — второе переносится */
+.total-foot { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; margin-top: 6px; }
+.total-foot .total-sub { margin-top: 0; }
+.total-net { margin-left: auto; color: var(--muted); font-size: 15px; white-space: nowrap; }
+.total-net b { color: var(--fg); font-weight: 600; }
+/* Погашенный долг в списке — приглушён */
+.row.paid .title, .row.paid .meta { color: var(--muted); }
 .bal-actions { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 
 /* Длинный список категорий в меню снизу прокручивается */
