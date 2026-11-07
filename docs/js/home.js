@@ -58,10 +58,6 @@ function tilesHtml() {
       ${tileHtml('habits', t('{0} из {1} сегодня', done, total))}
       ${tileHtml('money', t('{0} сегодня', formatMoney(todaySpent())))}
       ${tileHtml('lists', plural(lists.items.length, ['список', 'списка', 'списков']))}
-      <button class="tile add" data-act="quick-section">
-        ${plusIcon()}
-        <span class="tile-text"><b>${t('Новый раздел')}</b></span>
-      </button>
     </div>`;
 }
 
@@ -127,13 +123,5 @@ Object.assign(actions, {
     const tab = TABS.find((item) => item.key === key);
     if (tab.menu === false) go({ ...tab.root });
     else switchTab(key);
-  },
-
-  // Раздел создаётся в Задачах: сразу на их главный экран, там он и появится.
-  // Всё без пауз: иначе iPhone не откроет клавиатуру для окна ввода
-  'quick-section': () => {
-    switchTab('plans');
-    resetToRoot();
-    createSection();
   },
 });
