@@ -131,11 +131,10 @@ function balanceCardHtml(route) {
     ? (count ? plural(count, ['операция', 'операции', 'операций']) : t('Операций пока нет'))
     : (accounts.items.length ? plural(accounts.items.length, ['баланс', 'баланса', 'балансов']) : t('Нажми ＋, чтобы добавить первый баланс'));
   const dots = icon('<circle cx="6" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="18" cy="12" r="1"/>');
-  // На общем балансе сбоку — сколько будет, если вернуть свои долги и получить чужие
+  // На общем балансе сбоку — сколько останется, если вернуть свои долги (долги мне не считаем)
   const owe = debtsTotal('out');
-  const owed = debtsTotal('in');
-  const net = !acc && accounts.items.length && (owe || owed)
-    ? `<span class="total-net">${t('С учётом долгов')} <b>${formatMoney(totalBalance() - owe + owed)}</b></span>`
+  const net = !acc && accounts.items.length && owe
+    ? `<span class="total-net">${t('С учётом долгов')} <b>${formatMoney(totalBalance() - owe)}</b></span>`
     : '';
   return `
     <div class="total-card">
